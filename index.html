@@ -2586,18 +2586,18 @@ Pregunta: ${msg}`
       selA.innerHTML = '<option value="">— Selecciona —</option>' + opts;
       selB.innerHTML = '<option value="">— Selecciona —</option>' + opts;
 
-      // Cargar bodegas únicas desde los items (no desde inventarios)
+      // Cargar bodegas únicas desde los items
       try {
-        const res = await fetch(`${SB_URL}/rest/v1/inventario_items?select=ubicacion&ubicacion=not.is.null&ubicacion=not.eq.`, {
+        const res = await fetch(`${SB_URL}/rest/v1/inventario_items?select=ubicacion&limit=5000`, {
           headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
         });
         const items = await res.json();
-        const bodegas = [...new Set(items.map(i => i.ubicacion).filter(Boolean).map(b => b.trim()))].sort();
+        const bodegas = [...new Set(
+          items.map(i => (i.ubicacion || '').trim()).filter(b => b.length > 1)
+        )].sort();
         selBodega.innerHTML = '<option value="">Todas</option>' + bodegas.map(b => `<option value="${b}">${b}</option>`).join('');
       } catch(e) {
-        // Fallback: bodegas desde inventarios
-        const bodegas = [...new Set(_inventariosList.map(i => i.bodega).filter(Boolean))];
-        selBodega.innerHTML = '<option value="">Todas</option>' + bodegas.map(b => `<option value="${b}">${b}</option>`).join('');
+        console.error('Error cargando bodegas:', e);
       }
     }
 
