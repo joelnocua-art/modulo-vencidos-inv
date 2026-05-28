@@ -1286,6 +1286,7 @@
       <button class="ntab active" onclick="goTab('conteo',this)">Conteo</button>
       <button class="ntab" onclick="goTab('pistoleo',this)">Pistolear</button>
       <button class="ntab admin-only hidden" onclick="goTab('admin',this)">Admin</button>
+      <button class="ntab admin-only hidden" onclick="goTab('inventarios',this)">Inventarios</button>
       <button class="ntab" onclick="goTab('about',this)">About</button>
     </div>
 
@@ -1568,6 +1569,46 @@
                 Se guarda solo en este dispositivo. No se sube a GitHub.
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INVENTARIOS CÍCLICOS -->
+      <div id="tab-inventarios" style="display:none">
+        <div style="max-width:900px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+            <div style="font-size:22px;font-weight:800">Inventarios Cíclicos</div>
+            <button class="pbtn" onclick="crearInventario()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+              Nuevo inventario
+            </button>
+          </div>
+
+          <!-- Lista de inventarios -->
+          <div id="inv-lista" style="margin-bottom:2rem">
+            <div class="loading"><div class="spin"></div>Cargando inventarios...</div>
+          </div>
+
+          <!-- Comparador -->
+          <div class="pcard" id="inv-comparador" style="display:none">
+            <div style="font-size:14px;font-weight:700;margin-bottom:1rem;color:var(--accent)">📊 Comparador de inventarios</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:1rem;align-items:end">
+              <div class="fg">
+                <label class="flbl">Inventario A (anterior)</label>
+                <select class="fsel2" id="inv-sel-a" onchange="compararInventarios()"></select>
+              </div>
+              <div class="fg">
+                <label class="flbl">Inventario B (actual)</label>
+                <select class="fsel2" id="inv-sel-b" onchange="compararInventarios()"></select>
+              </div>
+              <div class="fg">
+                <label class="flbl">Bodega</label>
+                <select class="fsel2" id="inv-sel-bodega" onchange="compararInventarios()">
+                  <option value="">Todas</option>
+                </select>
+              </div>
+            </div>
+            <div id="inv-resultado"></div>
           </div>
         </div>
       </div>
@@ -2390,14 +2431,15 @@
 
     // ─── TABS ───
     function goTab(tab, btn) {
-      if (tab === 'admin' && CU?.role !== 'admin') { toast('No tienes permisos para acceder a esta sección', 'e'); return; }
-      ['conteo', 'pistoleo', 'admin', 'about'].forEach(t => {
+      if ((tab === 'admin' || tab === 'inventarios') && CU?.role !== 'admin') { toast('No tienes permisos para acceder a esta sección', 'e'); return; }
+      ['conteo', 'pistoleo', 'admin', 'inventarios', 'about'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (el) el.style.display = t === tab ? 'block' : 'none';
       });
       document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
       if (btn) btn.classList.add('active');
       if (tab === 'admin') updateAdmin();
+      if (tab === 'inventarios') cargarInventarios();
     }
     // ─── CHAT IA FLOTANTE ───
     let chatOpen = false;
@@ -2487,6 +2529,168 @@ Pregunta: ${msg}`
       div.textContent = msg;
       cont.appendChild(div);
       cont.scrollTop = cont.scrollHeight;
+    }
+
+    // ─── INVENTARIOS CÍCLICOS ───
+    let _inventariosList = [];
+
+    async function cargarInventarios() {
+      const el = document.getElementById('inv-lista');
+      el.innerHTML = '<div class="loading"><div class="spin"></div>Cargando...</div>';
+      try {
+        const res = await fetch(`${SB_URL}/rest/v1/inventarios?order=created_at.desc`, {
+          headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+        });
+        _inventariosList = await res.json();
+        renderInventarios();
+        actualizarSelectores();
+        if (_inventariosList.length >= 2) document.getElementById('inv-comparador').style.display = 'block';
+      } catch(e) {
+        el.innerHTML = '<div class="empty"><h3>Error cargando inventarios</h3></div>';
+      }
+    }
+
+    function renderInventarios() {
+      const el = document.getElementById('inv-lista');
+      if (!_inventariosList.length) {
+        el.innerHTML = '<div class="empty"><h3>Sin inventarios aún</h3><p>Crea el primero con el botón de arriba</p></div>';
+        return;
+      }
+      el.innerHTML = _inventariosList.map(inv => `
+        <div class="aitem" style="margin-bottom:8px;cursor:default">
+          <div class="adot" style="background:${inv.estado === 'abierto' ? 'var(--accent)' : 'var(--t3)'}"></div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-weight:700;font-size:14px">${inv.nombre}</span>
+              <span class="bdg ${inv.estado === 'abierto' ? 'bdg-disp' : 'bdg-inst'}">${inv.estado === 'abierto' ? 'Abierto' : 'Cerrado'}</span>
+              ${inv.bodega ? `<span style="font-size:11px;color:var(--t2)">${inv.bodega}</span>` : ''}
+            </div>
+            <div style="font-size:11px;color:var(--t3);font-family:var(--mono)">
+              Creado: ${new Date(inv.created_at).toLocaleDateString('es-CO')} · Por: ${inv.creado_por || '—'}
+              ${inv.fecha_cierre ? ' · Cerrado: ' + new Date(inv.fecha_cierre).toLocaleDateString('es-CO') : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            ${inv.estado === 'abierto' ? `<button class="sbtn" onclick="cerrarInventario('${inv.id}')">Cerrar</button>` : ''}
+            <button class="sbtn" onclick="verItems('${inv.id}','${inv.nombre}')">Ver items</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function actualizarSelectores() {
+      const selA = document.getElementById('inv-sel-a');
+      const selB = document.getElementById('inv-sel-b');
+      const selBodega = document.getElementById('inv-sel-bodega');
+      const opts = _inventariosList.map(inv => `<option value="${inv.id}">${inv.nombre} (${new Date(inv.created_at).toLocaleDateString('es-CO')})</option>`).join('');
+      selA.innerHTML = '<option value="">— Selecciona —</option>' + opts;
+      selB.innerHTML = '<option value="">— Selecciona —</option>' + opts;
+      // Bodegas únicas
+      const bodegas = [...new Set(_inventariosList.map(i => i.bodega).filter(Boolean))];
+      selBodega.innerHTML = '<option value="">Todas</option>' + bodegas.map(b => `<option value="${b}">${b}</option>`).join('');
+    }
+
+    async function crearInventario() {
+      const nombre = prompt('Nombre del inventario (ej: Mayo 2026):');
+      if (!nombre || !nombre.trim()) return;
+      const bodega = prompt('Bodega (deja vacío para todas):') || '';
+      try {
+        const res = await fetch(`${SB_URL}/rest/v1/inventarios`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ nombre: nombre.trim(), bodega: bodega.trim() || null, creado_por: CU.nombre, estado: 'abierto' })
+        });
+        if (res.ok) { toast('Inventario creado', 's'); cargarInventarios(); }
+        else toast('Error creando inventario', 'e');
+      } catch(e) { toast('Error: ' + e.message, 'e'); }
+    }
+
+    async function cerrarInventario(id) {
+      if (!confirm('¿Cerrar este inventario? Ya no se podrán agregar items.')) return;
+      try {
+        const res = await fetch(`${SB_URL}/rest/v1/inventarios?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` },
+          body: JSON.stringify({ estado: 'cerrado', fecha_cierre: new Date().toISOString() })
+        });
+        if (res.ok) { toast('Inventario cerrado', 's'); cargarInventarios(); }
+        else toast('Error cerrando inventario', 'e');
+      } catch(e) { toast('Error: ' + e.message, 'e'); }
+    }
+
+    async function verItems(id, nombre) {
+      try {
+        const res = await fetch(`${SB_URL}/rest/v1/inventario_items?inventario_id=eq.${id}&order=fecha.desc`, {
+          headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+        });
+        const items = await res.json();
+        if (!items.length) { toast('Este inventario no tiene items aún', 'e'); return; }
+        const csv = ['Serial,Nombre,Status,Ubicacion,Estanteria,Usuario,Fecha',
+          ...items.map(i => `"${i.serial}","${i.nombre||''}","${i.status||''}","${i.ubicacion||''}","${i.estanteria||''}","${i.usuario||''}","${i.fecha||''}"`)
+        ].join('\n');
+        const a = document.createElement('a');
+        a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+        a.download = `inventario_${nombre}_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        toast(`${items.length} items exportados`, 's');
+      } catch(e) { toast('Error: ' + e.message, 'e'); }
+    }
+
+    async function compararInventarios() {
+      const idA = document.getElementById('inv-sel-a').value;
+      const idB = document.getElementById('inv-sel-b').value;
+      const bodega = document.getElementById('inv-sel-bodega').value;
+      const el = document.getElementById('inv-resultado');
+      if (!idA || !idB || idA === idB) { el.innerHTML = ''; return; }
+      el.innerHTML = '<div class="loading"><div class="spin"></div>Comparando...</div>';
+      try {
+        const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` };
+        const filtBodega = bodega ? `&ubicacion=eq.${encodeURIComponent(bodega)}` : '';
+        const [rA, rB] = await Promise.all([
+          fetch(`${SB_URL}/rest/v1/inventario_items?inventario_id=eq.${idA}${filtBodega}`, { headers }),
+          fetch(`${SB_URL}/rest/v1/inventario_items?inventario_id=eq.${idB}${filtBodega}`, { headers })
+        ]);
+        const itemsA = await rA.json();
+        const itemsB = await rB.json();
+        const mapA = Object.fromEntries(itemsA.map(i => [i.serial, i]));
+        const mapB = Object.fromEntries(itemsB.map(i => [i.serial, i]));
+        const serialesA = new Set(Object.keys(mapA));
+        const serialesB = new Set(Object.keys(mapB));
+        const nuevos    = [...serialesB].filter(s => !serialesA.has(s));
+        const faltantes = [...serialesA].filter(s => !serialesB.has(s));
+        const movidos   = [...serialesB].filter(s => serialesA.has(s) && mapA[s].ubicacion !== mapB[s].ubicacion);
+        const nomA = _inventariosList.find(i => i.id === idA)?.nombre || 'A';
+        const nomB = _inventariosList.find(i => i.id === idB)?.nombre || 'B';
+        el.innerHTML = `
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.5rem">
+            <div class="sc"><div class="sc-lbl">✅ Nuevos en ${nomB}</div><div class="sc-val v-green">${nuevos.length}</div></div>
+            <div class="sc"><div class="sc-lbl">❌ Faltantes vs ${nomA}</div><div class="sc-val v-yellow">${faltantes.length}</div></div>
+            <div class="sc"><div class="sc-lbl">🔄 Movidos de bodega</div><div class="sc-val v-blue">${movidos.length}</div></div>
+          </div>
+          ${faltantes.length ? `
+          <div style="margin-bottom:1rem">
+            <div style="font-size:11px;color:var(--warn);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">❌ Equipos faltantes (estaban en ${nomA}, no en ${nomB})</div>
+            <div class="twrap"><table><thead><tr><th>Serial</th><th>Nombre</th><th>Última ubicación</th></tr></thead><tbody>
+            ${faltantes.map(s => `<tr><td class="mc">${s}</td><td class="nc">${mapA[s].nombre||'—'}</td><td class="uc">${mapA[s].ubicacion||'—'}</td></tr>`).join('')}
+            </tbody></table></div>
+          </div>` : ''}
+          ${nuevos.length ? `
+          <div style="margin-bottom:1rem">
+            <div style="font-size:11px;color:var(--accent);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">✅ Equipos nuevos en ${nomB}</div>
+            <div class="twrap"><table><thead><tr><th>Serial</th><th>Nombre</th><th>Ubicación</th></tr></thead><tbody>
+            ${nuevos.map(s => `<tr><td class="mc">${s}</td><td class="nc">${mapB[s].nombre||'—'}</td><td class="uc">${mapB[s].ubicacion||'—'}</td></tr>`).join('')}
+            </tbody></table></div>
+          </div>` : ''}
+          ${movidos.length ? `
+          <div>
+            <div style="font-size:11px;color:var(--info);font-family:var(--mono);text-transform:uppercase;margin-bottom:8px">🔄 Equipos movidos de bodega</div>
+            <div class="twrap"><table><thead><tr><th>Serial</th><th>Nombre</th><th>Antes</th><th>Ahora</th></tr></thead><tbody>
+            ${movidos.map(s => `<tr><td class="mc">${s}</td><td class="nc">${mapB[s].nombre||'—'}</td><td class="uc">${mapA[s].ubicacion||'—'}</td><td class="uc">${mapB[s].ubicacion||'—'}</td></tr>`).join('')}
+            </tbody></table></div>
+          </div>` : ''}
+          ${!faltantes.length && !nuevos.length && !movidos.length ? '<div class="empty"><h3>✅ Inventarios idénticos</h3><p>No hay diferencias entre los dos cortes</p></div>' : ''}
+        `;
+      } catch(e) { el.innerHTML = '<div class="empty"><h3>Error comparando</h3></div>'; }
     }
 
     // ─── PWA ───
