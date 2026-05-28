@@ -2578,16 +2578,27 @@ Pregunta: ${msg}`
       `).join('');
     }
 
-    function actualizarSelectores() {
+    async function actualizarSelectores() {
       const selA = document.getElementById('inv-sel-a');
       const selB = document.getElementById('inv-sel-b');
       const selBodega = document.getElementById('inv-sel-bodega');
       const opts = _inventariosList.map(inv => `<option value="${inv.id}">${inv.nombre} (${new Date(inv.created_at).toLocaleDateString('es-CO')})</option>`).join('');
       selA.innerHTML = '<option value="">— Selecciona —</option>' + opts;
       selB.innerHTML = '<option value="">— Selecciona —</option>' + opts;
-      // Bodegas únicas
-      const bodegas = [...new Set(_inventariosList.map(i => i.bodega).filter(Boolean))];
-      selBodega.innerHTML = '<option value="">Todas</option>' + bodegas.map(b => `<option value="${b}">${b}</option>`).join('');
+
+      // Cargar bodegas únicas desde los items (no desde inventarios)
+      try {
+        const res = await fetch(`${SB_URL}/rest/v1/inventario_items?select=ubicacion&ubicacion=not.is.null&ubicacion=not.eq.`, {
+          headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+        });
+        const items = await res.json();
+        const bodegas = [...new Set(items.map(i => i.ubicacion).filter(Boolean).map(b => b.trim()))].sort();
+        selBodega.innerHTML = '<option value="">Todas</option>' + bodegas.map(b => `<option value="${b}">${b}</option>`).join('');
+      } catch(e) {
+        // Fallback: bodegas desde inventarios
+        const bodegas = [...new Set(_inventariosList.map(i => i.bodega).filter(Boolean))];
+        selBodega.innerHTML = '<option value="">Todas</option>' + bodegas.map(b => `<option value="${b}">${b}</option>`).join('');
+      }
     }
 
     async function crearInventario() {
