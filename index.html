@@ -1986,8 +1986,8 @@
         const marca     = eq['marca']     || eq['Marca']             || '—';
         const biaCode   = eq['bia_code']  || eq['Código BIA']        || eq['BIA Code']   || '—';
         const ubicacion = eq['ubicacion'] || eq['Ubicación']         || eq['Ubicación WMS'] || '—';
-        const vencConf  = eq['venc_conf'] || eq['Venc. Conformidad'] || eq['Conformidad'] || '—';
-        const vencCalib = eq['venc_calib']|| eq['Venc. Calibración'] || eq['Calibración'] || '—';
+        const vencConf  = eq['vencimiento_certificado_conformidad'] || eq['venc_conf'] || eq['Venc. Conformidad'] || '—';
+        const vencCalib = eq['vencimiento_certificado_calibracion']  || eq['venc_calib'] || eq['Venc. Calibración'] || '—';
 
         const formatDate = (d) => {
           if (!d || d === '—') return '—';
