@@ -2103,6 +2103,7 @@
         <button class="cc-pillnav active" data-sec="resumen" onclick="ccSec('resumen')">Resumen</button>
         <button class="cc-pillnav" data-sec="equipos" onclick="ccSec('equipos')">Equipos</button>
         <button class="cc-pillnav" data-sec="gestion" onclick="ccSec('gestion')">Gestión</button>
+        <button class="cc-pillnav" data-sec="alertas" onclick="ccSec('alertas')">Alertas</button>
         <button class="cc-pillnav" data-sec="lab" onclick="ccSec('lab')">Laboratorio</button>
         <button class="cc-pillnav" data-sec="analisis" onclick="ccSec('analisis')">Análisis</button>
         <button class="cc-pillnav" data-sec="auditoria" onclick="ccSec('auditoria')">Auditoría</button>
@@ -2199,15 +2200,95 @@
         <div id="cc-gest"></div>
       </section>
 
+      <!-- ============================== ALERTAS ========================= -->
+      <section id="sec-alertas" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Alertas y reportes</div>
+        <div class="cc-secsub">Alertas preventivas de vencimiento y reporte de desasignación. Aquí se calcula <b>a
+            quién se avisaría hoy</b>; el envío automático diario es el gancho de Capa B. <span class="cc-conn">envío
+            automático · Apps Script</span></div>
+
+        <div class="cc-card" style="margin-bottom:1.5rem">
+          <div class="ct"><span class="d" style="background:var(--accent)"></span>Configuración</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+            <div>
+              <div class="cc-fld"><label>Ventanas de aviso preventivo (días, separadas por coma)</label>
+                <input type="text" id="cc-win" value="30,15,7" oninput="ccSaveCfg();ccAlertas()"></div>
+              <div class="cc-fld"><label>Ventana de desasignación (días)</label>
+                <input type="number" id="cc-deswin" value="30" min="1" oninput="ccSaveCfg();ccAlertas()"></div>
+              <label style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="cc-toBia" checked onchange="ccSaveCfg();ccAlertas()"> Avisar a Bia</label>
+              <label
+                style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px">
+                <input type="checkbox" id="cc-toContr" checked onchange="ccSaveCfg();ccAlertas()"> Avisar a
+                contratistas</label>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--t2);font-weight:600">Correo de contratistas <span
+                  style="color:var(--t3)">(para el aviso)</span></label>
+              <div id="cc-emails"
+                style="margin-top:8px;max-height:180px;overflow:auto;display:flex;flex-direction:column;gap:6px"></div>
+            </div>
+          </div>
+          <div class="cc-help" style="margin-top:10px">Se guarda en este dispositivo. Con Capa B pasa a una pestaña del
+            Sheet para todo el equipo. <span class="cc-conn">persistencia · Google Sheet</span></div>
+        </div>
+
+        <div class="cc-card" style="margin-bottom:1.5rem">
+          <div class="ct"><span class="d" style="background:var(--warn)"></span>Alertas preventivas que se enviarían hoy
+          </div>
+          <div class="cc-grid k4" id="cc-alkpi" style="margin-bottom:1rem"></div>
+          <div id="cc-allist"></div>
+        </div>
+
+        <div class="cc-card">
+          <div class="ct"><span class="d" style="background:var(--purple)"></span>Desasignación por vencimiento ·
+            reporte de impacto</div>
+          <div class="cc-secsub" style="margin-bottom:1rem">Equipos <b>ASIGNADO</b> con certificado vencido o por vencer
+            en la ventana: candidatos a desasignación.</div>
+          <div class="cc-grid k3" id="cc-deskpi" style="margin-bottom:1.25rem"></div>
+          <div class="cc-grid k2">
+            <div>
+              <div class="ct"><span class="d" style="background:var(--purple)"></span>Impacto por contratista / sede
+              </div>
+              <div class="cc-bars" id="cc-desbars"></div>
+            </div>
+            <div>
+              <div class="ct"><span class="d" style="background:var(--danger)"></span>Equipos en riesgo</div>
+              <div id="cc-deslist" style="max-height:340px;overflow:auto"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ============================ LABORATORIO ========================= -->
       <section id="sec-lab" class="cc-sec" style="display:none">
-        <div class="cc-sectitle">Seguimiento de laboratorio</div>
-        <div class="cc-secsub">Equipos ubicados en laboratorios externos (METROBIT / INPEL) según el inventario, con su
-          estado de certificación.</div>
+        <div class="cc-sectitle">Seguimiento de laboratorio · SLA</div>
+        <div class="cc-secsub">Equipos en laboratorios externos (METROBIT / INPEL). Carga el archivo de <b>envíos a
+            calibrar</b> (Excel/CSV) para activar el cálculo de días en laboratorio e incumplimiento de SLA.</div>
+
+        <div class="cc-card" style="margin-bottom:1.25rem">
+          <div class="ct"><span class="d" style="background:var(--accent)"></span>Envíos a laboratorio + SLA</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+            <label class="cc-btn go" style="cursor:pointer">⬆ Cargar Excel / CSV
+              <input type="file" accept=".csv,.xlsx,.xls" style="display:none" onchange="ccUploadEnvios(this)"></label>
+            <button class="cc-btn" onclick="ccTemplate()">Descargar plantilla CSV</button>
+            <button class="cc-btn" onclick="ccDemoEnvios()">Cargar ejemplo</button>
+            <button class="cc-btn danger" onclick="ccClearEnvios()">Borrar envíos</button>
+            <span id="cc-envstat" class="cc-conn">sin envíos cargados</span>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap">
+            <div class="cc-fld" style="margin-bottom:0"><label>SLA METROBIT (días)</label><input type="number"
+                id="cc-slaMB" value="15" min="1" style="width:120px" oninput="ccSaveCfg();ccLab()"></div>
+            <div class="cc-fld" style="margin-bottom:0"><label>SLA INPEL (días)</label><input type="number"
+                id="cc-slaIN" value="20" min="1" style="width:120px" oninput="ccSaveCfg();ccLab()"></div>
+          </div>
+          <div class="cc-help" style="margin-top:8px">Columnas del archivo: <b>serial</b>, <b>proveedor</b>
+            (METROBIT/INPEL) y <b>fecha</b> de envío (acepta 29/05/2026, 2026-05-29 o “mayo 29, 2026”). PDF: carga
+            manual por ahora — no se parsea en el navegador.</div>
+        </div>
+
         <div class="cc-grid k3" id="cc-labkpi"></div>
         <div class="cc-lab" id="cc-lablist"></div>
-        <div class="cc-help" style="margin-top:14px">El control de SLA (días de estancia) requiere una fecha de
-          “ingreso a laboratorio”. <span class="cc-conn">pendiente · n8n + campo de ingreso</span></div>
       </section>
 
       <!-- ============================== ANÁLISIS ========================= -->
@@ -2281,6 +2362,8 @@
       if (m && MES[m[1]] !== undefined) return new Date(+m[3], MES[m[1]], +m[2]);
       m = s.toLowerCase().match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/);       // "14 de mayo de 2027"
       if (m && MES[m[2]] !== undefined) return new Date(+m[3], MES[m[2]], +m[1]);
+      m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);                            // "29/05/2026" (dd/mm/yyyy)
+      if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
       const d = new Date(s); return isNaN(d) ? null : d;
     }
     const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
@@ -2500,20 +2583,34 @@
       } catch (err) { toast('No se pudo consultar (CORS/red). Funciona desplegado con el proxy.', 'e'); }
     }
 
-    /* ===================== LABORATORIO ===================== */
+    /* ===================== LABORATORIO · SLA ===================== */
+    let ENVIOS = {};  // serial -> { prov, fecha }
+    const slaTarget = prov => prov === 'METROBIT' ? (+(document.getElementById('cc-slaMB') || {}).value || 15) : (+(document.getElementById('cc-slaIN') || {}).value || 20);
+    const diasEnLab = fecha => { const d = diasA(fecha); return d == null ? null : -d; };
     function ccLab() {
       const labs = ALL.filter(e => /INPEL|METROBIT/i.test(e.ubic) && !e._acc);
+      const nEnv = Object.keys(ENVIOS).length;
+      let breach = 0;
+      labs.forEach(e => { const x = ENVIOS[e.serial]; if (x) { const dd = diasEnLab(x.fecha), prov = /METROBIT/i.test(e.ubic) ? 'METROBIT' : 'INPEL'; if (dd != null && dd - slaTarget(prov) > 0) breach++; } });
       const mb = labs.filter(e => /METROBIT/i.test(e.ubic)).length, inp = labs.filter(e => /INPEL/i.test(e.ubic)).length;
-      const venc = labs.filter(e => e._d != null && e._d < 0).length;
-      const kpi = [['En METROBIT', mb, 'var(--purple)'], ['En INPEL', inp, 'var(--info)'], ['Vencidos en lab', venc, 'var(--danger)']];
+      const kpi = [['En METROBIT', mb, 'var(--purple)'], ['En INPEL', inp, 'var(--info)'], ['Exceden SLA', nEnv ? breach : '—', 'var(--danger)']];
       document.getElementById('cc-labkpi').innerHTML = kpi.map(([l, v, c]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div></div>`).join('');
-      document.getElementById('cc-lablist').innerHTML = labs.sort((a, b) => (a._d == null ? 1e9 : a._d) - (b._d == null ? 1e9 : b._d)).slice(0, 60).map(e => {
+      const stat = document.getElementById('cc-envstat'); if (stat) { stat.textContent = nEnv ? `${nEnv} envíos cargados` : 'sin envíos cargados'; }
+      document.getElementById('cc-lablist').innerHTML = labs.sort((a, b) => (a._d == null ? 1e9 : a._d) - (b._d == null ? 1e9 : b._d)).slice(0, 80).map(e => {
         const prov = /METROBIT/i.test(e.ubic) ? 'METROBIT' : 'INPEL';
         const col = prov === 'METROBIT' ? 'var(--purple)' : 'var(--info)';
+        const x = ENVIOS[e.serial];
+        let sla;
+        if (x) {
+          const dd = diasEnLab(x.fecha), over = dd - slaTarget(prov);
+          sla = `<div style="font-size:16px;font-weight:800;color:${over > 0 ? 'var(--danger)' : 'var(--accent)'}">${dd} d</div>${over > 0 ? `<span style="color:var(--danger)">SLA +${over} d</span>` : `<span style="color:var(--accent)">dentro de SLA</span>`}`;
+        } else {
+          sla = `<div style="font-size:13px;font-weight:700;color:${dColor(e._d)}">${e._d == null ? '—' : (e._d < 0 ? 'venc.' : '+' + e._d + ' d')}</div><span style="color:var(--t3)">sin envío</span>`;
+        }
         return `<div class="cc-labrow" style="cursor:pointer" onclick="ccSelect('${(e.serial + '').replace(/'/g, "\\'")}',true)">
           <div class="prov" style="background:${col}22;color:${col}">${prov.slice(0, 2)}</div>
-          <div class="info"><div class="t">${e.serial} · ${e.sku}</div><div class="s">${prov} · ${e.estado} · ${e.marca || 's/marca'}</div></div>
-          <div class="sla"><div style="font-size:16px;font-weight:800;color:${dColor(e._d)}">${e._d == null ? '—' : (e._d < 0 ? 'venc.' : '+' + e._d + ' d')}</div>${rBadge(e._d)}</div>
+          <div class="info"><div class="t">${e.serial} · ${e.sku}</div><div class="s">${prov} · ${e.estado}${x ? ' · enviado ' + fFecha(x.fecha) : ''} · venc. ${e._n ? fFecha(e._n.date) : '—'}</div></div>
+          <div class="sla">${sla}</div>
         </div>`;
       }).join('') || '<div class="cc-help">No hay equipos en laboratorios en este conjunto de datos.</div>';
     }
@@ -2552,6 +2649,110 @@
         <div style="margin-top:12px"><span class="cc-conn">abrir en Metabase</span></div></div></div>`).join('');
     }
 
+    /* ===================== CONFIG (localStorage) ===================== */
+    const CFG = Object.assign({ win: '30,15,7', deswin: 30, toBia: true, toContr: true, slaMB: 15, slaIN: 20, emails: {} }, JSON.parse(localStorage.getItem('cc_cfg') || '{}'));
+    ENVIOS = JSON.parse(localStorage.getItem('cc_envios') || '{}');
+    const seg = u => /^bia/i.test(u) ? 'Bia' : /METROBIT|INPEL/i.test(u) ? 'Lab' : (u === 'INSTALADO' || !u) ? 'Otro' : 'Contratista';
+    const winList = () => CFG.win.split(',').map(x => +x.trim()).filter(x => !isNaN(x)).sort((a, b) => a - b);
+    function ccApplyCfg() {
+      const set = (id, v) => { const el = document.getElementById(id); if (el) { if (el.type === 'checkbox') el.checked = v; else el.value = v; } };
+      set('cc-win', CFG.win); set('cc-deswin', CFG.deswin); set('cc-toBia', CFG.toBia); set('cc-toContr', CFG.toContr); set('cc-slaMB', CFG.slaMB); set('cc-slaIN', CFG.slaIN);
+    }
+    function ccSaveCfg() {
+      const g = id => document.getElementById(id);
+      if (g('cc-win')) CFG.win = g('cc-win').value;
+      if (g('cc-deswin')) CFG.deswin = +g('cc-deswin').value || 30;
+      if (g('cc-toBia')) CFG.toBia = g('cc-toBia').checked;
+      if (g('cc-toContr')) CFG.toContr = g('cc-toContr').checked;
+      if (g('cc-slaMB')) CFG.slaMB = +g('cc-slaMB').value || 15;
+      if (g('cc-slaIN')) CFG.slaIN = +g('cc-slaIN').value || 20;
+      localStorage.setItem('cc_cfg', JSON.stringify(CFG));
+    }
+    function ccRenderEmails() {
+      const cont = [...new Set(gestionables().filter(e => seg(e.ubic) === 'Contratista').map(e => e.ubic))].sort();
+      const box = document.getElementById('cc-emails'); if (!box) return;
+      box.innerHTML = cont.length ? cont.map(c => `<div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11px;color:var(--t2);min-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${c}">${c}</span>
+        <input class="mini" style="flex:1" placeholder="correo@contratista.com" value="${CFG.emails[c] || ''}" oninput="CFG.emails['${c.replace(/'/g, "\\'")}']=this.value;localStorage.setItem('cc_cfg',JSON.stringify(CFG))"></div>`).join('') : '<div class="cc-help">No hay contratistas en la población gestionable.</div>';
+    }
+
+    /* ===================== #1 ALERTAS PREVENTIVAS ===================== */
+    function ccAlertas() {
+      const g = gestionables(), wins = winList(), bucket = {}; wins.forEach(w => bucket[w] = []);
+      let venc = [];
+      g.forEach(e => { if (e._d < 0) { venc.push(e); return; } const w = wins.find(w => e._d <= w); if (w !== undefined) bucket[w].push(e); });
+      const segOk = e => (CFG.toBia && seg(e.ubic) === 'Bia') || (CFG.toContr && seg(e.ubic) === 'Contratista') || seg(e.ubic) === 'Lab';
+      const kpis = wins.map(w => [`≤ ${w} días`, bucket[w].filter(segOk).length, w <= 7 ? 'var(--danger)' : w <= 15 ? 'var(--warn)' : 'var(--info)']);
+      document.getElementById('cc-alkpi').innerHTML = kpis.map(([l, v, c]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div></div>`).join('') || '<div class="cc-help">Configura al menos una ventana.</div>';
+      let html = '';
+      wins.forEach(w => {
+        const arr = bucket[w].filter(segOk).sort((a, b) => a._d - b._d); if (!arr.length) return;
+        const bia = arr.filter(e => seg(e.ubic) === 'Bia').length, con = arr.filter(e => seg(e.ubic) === 'Contratista').length;
+        html += `<div style="margin-top:16px"><div style="font-size:12px;font-weight:700;margin-bottom:8px">Ventana ≤ ${w} días · ${arr.length} equipos <span style="color:var(--t3);font-weight:400;font-family:var(--mono)">(Bia ${bia} · contratistas ${con})</span></div>
+          <table><thead><tr><th>Serial</th><th>SKU</th><th>Destino</th><th>Días</th><th>Avisar a</th></tr></thead><tbody>${arr.slice(0, 40).map(e => { const sg = seg(e.ubic); const to = sg === 'Bia' ? 'Supply (Bia)' : sg === 'Contratista' ? (CFG.emails[e.ubic] || '<span style="color:var(--warn)">falta correo</span>') : 'Supply (lab)'; return `<tr style="cursor:pointer" onclick="ccSelect('${(e.serial + '').replace(/'/g, "\\'")}',true)"><td class="mc">${e.serial}</td><td class="nc">${e.sku}</td><td>${e.ubic}</td><td style="font-family:var(--mono);font-weight:700;color:${dColor(e._d)}">+${e._d}</td><td style="font-size:11px">${to}</td></tr>`; }).join('')}</tbody></table>${arr.length > 40 ? `<div class="cc-help">+${arr.length - 40} más…</div>` : ''}</div>`;
+      });
+      const total = wins.reduce((s, w) => s + bucket[w].filter(segOk).length, 0);
+      document.getElementById('cc-allist').innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+        <button class="cc-btn go" onclick="ccSimular(${total})">Simular envío (${total})</button>
+        <span class="cc-conn">envío real · Apps Script (cron 7 AM) + dedupe en Sheet</span></div>
+        ${html || '<div class="cc-help">No hay equipos dentro de las ventanas configuradas.</div>'}
+        ${venc.length ? `<div class="cc-help" style="margin-top:10px">Además hay <b style="color:#fca5a5">${venc.length} ya vencidos</b> (fuera de ventana preventiva) — ver Resumen / Equipos.</div>` : ''}`;
+    }
+    function ccSimular(n) { toast(`🔌 Simulado: hoy se enviarían ${n} alertas. Conecta Apps Script para el envío real.`, 's'); }
+
+    /* ===================== #3 DESASIGNACIÓN + IMPACTO ===================== */
+    function ccDesasig() {
+      const w = CFG.deswin || 30;
+      const risk = ALL.filter(e => e.estado === 'ASIGNADO' && !e._acc && e._d != null && e._d <= w);
+      const venc = risk.filter(e => e._d < 0).length;
+      const byC = {}; risk.forEach(e => byC[e.ubic || '(s/u)'] = (byC[e.ubic || '(s/u)'] || 0) + 1);
+      const kpi = [['En riesgo', risk.length, 'var(--purple)'], ['Ya vencidos', venc, '#fca5a5'], ['Sedes/contratistas', Object.keys(byC).length, 'var(--info)']];
+      document.getElementById('cc-deskpi').innerHTML = kpi.map(([l, v, c]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div></div>`).join('');
+      document.getElementById('cc-desbars').innerHTML = barsHTML(Object.entries(byC).sort((a, b) => b[1] - a[1]).slice(0, 10), 'var(--purple)');
+      document.getElementById('cc-deslist').innerHTML = risk.length ? `<table><thead><tr><th>Serial</th><th>SKU</th><th>Sede</th><th>Días</th></tr></thead><tbody>${risk.sort((a, b) => a._d - b._d).map(e => `<tr style="cursor:pointer" onclick="ccSelect('${(e.serial + '').replace(/'/g, "\\'")}',true)"><td class="mc">${e.serial}</td><td class="nc">${e.sku}</td><td>${e.ubic}</td><td style="font-family:var(--mono);font-weight:700;color:${dColor(e._d)}">${e._d < 0 ? e._d : '+' + e._d}</td></tr>`).join('')}</tbody></table>` : '<div class="cc-help">Sin equipos asignados en riesgo en esta ventana 🎉</div>';
+    }
+
+    /* ===================== #2 ENVÍOS A LAB (carga de archivo) ===================== */
+    function loadSheetJS() { return new Promise((res, rej) => { if (window.XLSX) return res(); const s = document.createElement('script'); s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'; s.onload = () => res(); s.onerror = () => rej(new Error('no se pudo cargar el lector de Excel (sin internet). Usa CSV.')); document.head.appendChild(s); }); }
+    const cell = v => (v == null ? '' : String(v)).trim();
+    function detectCols(header) { const h = header.map(x => cell(x).toLowerCase()); return { s: h.findIndex(x => /serial|serie/.test(x)), p: h.findIndex(x => /prov|lab|destino/.test(x)), f: h.findIndex(x => /fecha|env|date/.test(x)) }; }
+    function ingestRows(rows) {
+      rows = rows.filter(r => r && r.length); if (!rows.length) { toast('El archivo está vacío', 'e'); return; }
+      const col = detectCols(rows[0]);
+      if (col.s < 0 || col.f < 0) { toast('No encuentro columnas serial/fecha. Usa la plantilla.', 'e'); return; }
+      let n = 0;
+      rows.slice(1).forEach(r => { const serial = cell(r[col.s]); if (!serial) return; let prov = col.p >= 0 ? cell(r[col.p]).toUpperCase() : ''; prov = /METRO/.test(prov) ? 'METROBIT' : /INPEL/.test(prov) ? 'INPEL' : prov; ENVIOS[serial] = { prov, fecha: cell(r[col.f]) }; n++; });
+      localStorage.setItem('cc_envios', JSON.stringify(ENVIOS));
+      toast(`✓ ${n} envíos cargados`, 's'); ccLab();
+    }
+    async function ccUploadEnvios(input) {
+      const f = input.files[0]; if (!f) return;
+      try {
+        if (/\.csv$/i.test(f.name)) {
+          const text = await f.text(), lines = text.split(/\r?\n/).filter(l => l.trim());
+          const delim = (lines[0].match(/;/g) || []).length > (lines[0].match(/,/g) || []).length ? ';' : ',';
+          ingestRows(lines.map(l => l.split(delim)));
+        } else {
+          await loadSheetJS();
+          const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+          ingestRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' }));
+        }
+      } catch (e) { toast('No se pudo leer: ' + (e.message || e), 'e'); }
+      input.value = '';
+    }
+    function ccTemplate() {
+      const csv = 'serial;proveedor;fecha\n241558009;METROBIT;15/04/2026\n62120944;INPEL;02/05/2026\n';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = 'plantilla_envios_laboratorio.csv'; a.click(); toast('Plantilla descargada', 's');
+    }
+    function ccDemoEnvios() {
+      const labs = ALL.filter(e => /INPEL|METROBIT/i.test(e.ubic) && !e._acc).slice(0, 40);
+      labs.forEach((e, i) => { const d = new Date(TODAY); d.setDate(d.getDate() - (5 + (i * 37) % 40)); ENVIOS[e.serial] = { prov: /METRO/i.test(e.ubic) ? 'METROBIT' : 'INPEL', fecha: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }; });
+      localStorage.setItem('cc_envios', JSON.stringify(ENVIOS));
+      toast('Ejemplo cargado (fechas de envío ficticias para ver el SLA)', 's'); ccLab();
+    }
+    function ccClearEnvios() { ENVIOS = {}; localStorage.removeItem('cc_envios'); toast('Envíos borrados', 's'); ccLab(); }
+
     /* ===================== NAV / CARGA ===================== */
     function ccSec(name) {
       document.querySelectorAll('.cc-sec').forEach(s => s.style.display = s.id === 'sec-' + name ? 'block' : 'none');
@@ -2571,7 +2772,7 @@
       el.style.borderColor = live ? 'rgba(74,222,128,.25)' : 'rgba(251,191,36,.25)';
       dot.style.background = col; dot.style.boxShadow = `0 0 6px ${col}`;
     }
-    function renderAll() { ccResumen(); ccFillSelects(); ccRenderTabla(); ccRenderGestion(); ccLab(); ccAnalisis(); ccAudit(); }
+    function renderAll() { ccApplyCfg(); ccResumen(); ccFillSelects(); ccRenderTabla(); ccRenderGestion(); ccRenderEmails(); ccAlertas(); ccDesasig(); ccLab(); ccAnalisis(); ccAudit(); }
 
     async function ccLoad() {
       for (const url of ['mb-data.json', 'mb-data-mini.json']) {
