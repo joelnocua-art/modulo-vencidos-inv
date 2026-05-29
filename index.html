@@ -1288,6 +1288,7 @@
       <button class="ntab admin-only hidden" onclick="goTab('admin',this)">Admin</button>
       <button class="ntab admin-only hidden" onclick="goTab('inventarios',this)">Inventarios</button>
       <button class="ntab" onclick="goTab('about',this)">About</button>
+      <button class="ntab" onclick="goTab('vencidos',this)">Vencidos</button>
     </div>
 
     <div class="main">
@@ -1652,6 +1653,12 @@
               Funciona en cualquier dispositivo.</div>
           </div>
         </div>
+      </div>
+
+      <!-- ===== VENCIDOS · módulo aislado en iframe (no toca CSS/JS de los demás módulos) ===== -->
+      <div id="tab-vencidos" style="display:none">
+        <iframe src="certcontrol.html" title="Módulo de Vencidos" loading="lazy"
+          style="width:100%;height:calc(100vh - 150px);min-height:560px;border:0;border-radius:14px;background:var(--bg)"></iframe>
       </div>
 
     </div>
@@ -2432,7 +2439,7 @@
     // ─── TABS ───
     function goTab(tab, btn) {
       if ((tab === 'admin' || tab === 'inventarios') && CU?.role !== 'admin') { toast('No tienes permisos para acceder a esta sección', 'e'); return; }
-      ['conteo', 'pistoleo', 'admin', 'inventarios', 'about'].forEach(t => {
+      ['conteo', 'pistoleo', 'admin', 'inventarios', 'about', 'vencidos'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (el) el.style.display = t === tab ? 'block' : 'none';
       });

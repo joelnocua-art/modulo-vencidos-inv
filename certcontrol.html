@@ -2082,6 +2082,17 @@
 </head>
 
 <body>
+  <script>
+    /* Si el módulo se abre EMBEBIDO como pestaña del Inventario (dentro de un
+       iframe), oculta su propio header y su nav para no duplicar el chrome ni
+       navegar anidado. Abierto directamente (página completa) no cambia nada. */
+    if (window.self !== window.top) {
+      document.documentElement.classList.add('cc-embed');
+      var __ccEmbed = document.createElement('style');
+      __ccEmbed.textContent = '.cc-embed .nav{display:none!important}.cc-embed .hlogo,.cc-embed .uchip,.cc-embed .lout{display:none!important}.cc-embed .hdr{justify-content:flex-end;min-height:0;padding:10px 0}.cc-embed .main{padding-top:14px}';
+      document.head.appendChild(__ccEmbed);
+    }
+  </script>
   <div id="app-screen" style="display:block">
 
     <!-- ===== HEADER (mismo chrome del Inventario) ===== -->
