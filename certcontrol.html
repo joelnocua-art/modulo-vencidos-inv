@@ -2258,6 +2258,10 @@
                 style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px">
                 <input type="checkbox" id="cc-toContr" checked onchange="ccSaveCfg();ccAlertas()"> Avisar a
                 contratistas</label>
+              <div class="cc-fld" style="margin-top:12px"><label>URL de Apps Script <span
+                    style="color:var(--t3)">(Capa B · opcional)</span></label>
+                <input type="text" id="cc-appsurl" placeholder="https://script.google.com/.../exec"
+                  oninput="ccSaveCfg();ccAlertas()"></div>
             </div>
             <div>
               <label style="font-size:11px;color:var(--t2);font-weight:600">Correo de contratistas <span
@@ -2687,13 +2691,13 @@
     }
 
     /* ===================== CONFIG (localStorage) ===================== */
-    const CFG = Object.assign({ win: '30,15,7', deswin: 30, toBia: true, toContr: true, slaMB: 15, slaIN: 20, emails: {} }, JSON.parse(localStorage.getItem('cc_cfg') || '{}'));
+    const CFG = Object.assign({ win: '30,15,7', deswin: 30, toBia: true, toContr: true, slaMB: 15, slaIN: 20, emails: {}, appsUrl: '' }, JSON.parse(localStorage.getItem('cc_cfg') || '{}'));
     ENVIOS = JSON.parse(localStorage.getItem('cc_envios') || '{}');
     const seg = u => /^bia/i.test(u) ? 'Bia' : /METROBIT|INPEL/i.test(u) ? 'Lab' : (u === 'INSTALADO' || !u) ? 'Otro' : 'Contratista';
     const winList = () => CFG.win.split(',').map(x => +x.trim()).filter(x => !isNaN(x)).sort((a, b) => a - b);
     function ccApplyCfg() {
       const set = (id, v) => { const el = document.getElementById(id); if (el) { if (el.type === 'checkbox') el.checked = v; else el.value = v; } };
-      set('cc-win', CFG.win); set('cc-deswin', CFG.deswin); set('cc-toBia', CFG.toBia); set('cc-toContr', CFG.toContr); set('cc-slaMB', CFG.slaMB); set('cc-slaIN', CFG.slaIN);
+      set('cc-win', CFG.win); set('cc-deswin', CFG.deswin); set('cc-toBia', CFG.toBia); set('cc-toContr', CFG.toContr); set('cc-slaMB', CFG.slaMB); set('cc-slaIN', CFG.slaIN); set('cc-appsurl', CFG.appsUrl || '');
     }
     function ccSaveCfg() {
       const g = id => document.getElementById(id);
@@ -2703,6 +2707,7 @@
       if (g('cc-toContr')) CFG.toContr = g('cc-toContr').checked;
       if (g('cc-slaMB')) CFG.slaMB = +g('cc-slaMB').value || 15;
       if (g('cc-slaIN')) CFG.slaIN = +g('cc-slaIN').value || 20;
+      if (g('cc-appsurl')) CFG.appsUrl = g('cc-appsurl').value.trim();
       localStorage.setItem('cc_cfg', JSON.stringify(CFG));
     }
     function ccRenderEmails() {
@@ -2730,12 +2735,22 @@
       });
       const total = wins.reduce((s, w) => s + bucket[w].filter(segOk).length, 0);
       document.getElementById('cc-allist').innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
-        <button class="cc-btn go" onclick="ccSimular(${total})">Simular envío (${total})</button>
+        <button class="cc-btn go" onclick="ccSimular(${total})">${CFG.appsUrl ? '✉ Enviar ahora' : 'Simular envío'} (${total})</button>
         <span class="cc-conn">envío real · Apps Script (cron 7 AM) + dedupe en Sheet</span></div>
         ${html || '<div class="cc-help">No hay equipos dentro de las ventanas configuradas.</div>'}
         ${venc.length ? `<div class="cc-help" style="margin-top:10px">Además hay <b style="color:#fca5a5">${venc.length} ya vencidos</b> (fuera de ventana preventiva) — ver Resumen / Equipos.</div>` : ''}`;
     }
-    function ccSimular(n) { toast(`🔌 Simulado: hoy se enviarían ${n} alertas. Conecta Apps Script para el envío real.`, 's'); }
+    async function ccSimular(n) {
+      const url = (CFG.appsUrl || '').trim();
+      if (!url) { toast(`🔌 Simulado: hoy se enviarían ${n} alertas. Pega la URL de Apps Script (en Configuración) para el envío real.`, 's'); return; }
+      try {
+        // no-cors: el Web App de Apps Script no devuelve cabeceras CORS; la petición
+        // se ejecuta igual y el registro autoritativo queda en el Log de la Sheet.
+        await fetch(url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ accion: 'enviar' }) });
+        toast('✓ Envío disparado en Apps Script · revisa el Log de la Sheet y los correos', 's');
+        pushLog('—', 'Envío de alertas', `Disparado vía Apps Script · ${n} candidatos (Capa B recalcula y deduplica)`, 'var(--accent)'); ccAudit();
+      } catch (e) { toast('No se pudo contactar Apps Script: ' + (e.message || e), 'e'); }
+    }
 
     /* ===================== #3 DESASIGNACIÓN + IMPACTO ===================== */
     function ccDesasig() {
