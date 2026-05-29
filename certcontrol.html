@@ -2128,11 +2128,11 @@
       <!-- ===== AVISO DE ALCANCE ===== -->
       <div class="cc-int">
         <span class="ico">⚡</span>
-        <div><b>Datos reales</b> del inventario (snapshot de Metabase incluido en el repo). El semáforo, rangos y KPIs
-          se calculan con la fecha de hoy. El detalle de un equipo puede <b>refrescarse en vivo</b> desde Metabase si
-          hay API key configurada (Inventario → Admin). Lo que aún requiere la <b>Capa B</b> está marcado con
-          <span class="cc-conn">pendiente</span>: historial persistente, bloqueo automático y envío de alertas
-          (Apps Script + Google Sheet).</div>
+        <div><b>Datos reales</b> del inventario. Con la <b>API key configurada</b> (Inventario → Admin) el módulo
+          carga <b>EN VIVO</b> el inventario completo desde Metabase (card 18021) en cada apertura; sin ella usa el
+          snapshot incluido en el repo. El semáforo, rangos y KPIs se calculan con la fecha de hoy. Lo que aún requiere
+          la <b>Capa B</b> está marcado con <span class="cc-conn">pendiente</span>: historial persistente, bloqueo
+          automático y envío de alertas (Apps Script + Google Sheet).</div>
       </div>
 
       <!-- ===== SUB-NAV DEL MÓDULO ===== -->
@@ -2905,9 +2905,25 @@
     }
     function renderAll() { ccApplyCfg(); ccHoy(); ccResumen(); ccFillSelects(); ccRenderTabla(); ccRenderGestion(); ccRenderEmails(); ccAlertas(); ccDesasig(); ccLab(); ccAnalisis(); ccAudit(); }
 
+    // Mapea una fila cruda de Metabase (card 18021) a la forma que espera norm(),
+    // tolerando alias cortos y nombres largos de columna.
+    function mbRow(r) {
+      const pick = (...ks) => { for (const k of ks) if (r[k] != null && r[k] !== '') return r[k]; return ''; };
+      return {
+        serial: pick('serial', 'serial_number', 'numero_serie', 'serie'),
+        sku: pick('sku', 'modelo', 'producto', 'descripcion'),
+        estado: pick('estado', 'status'),
+        marca: pick('marca', 'brand', 'fabricante'),
+        ubicacion: pick('ubicacion', 'ubicación', 'bodega', 'location'),
+        bia_code: pick('bia_code', 'codigo_bia', 'bia'),
+        venc_calib: pick('venc_calib', 'vencimiento_certificado_calibracion', 'vencimiento_calibracion'),
+        venc_conf: pick('venc_conf', 'vencimiento_certificado_conformidad', 'vencimiento_conformidad')
+      };
+    }
     async function ccLoad() {
-      // Intenta datos EN VIVO de Metabase si hay API key
-      const mbKey = localStorage.getItem('cc_mb_key');
+      // Datos EN VIVO de Metabase (card 18021) si hay API key configurada en
+      // Inventario → Admin (la misma clave que usa la app principal: bia_mb_key).
+      const mbKey = localStorage.getItem('bia_mb_key');
       if (mbKey) {
         try {
           const res = await fetch('/api/metabase', {
@@ -2918,7 +2934,7 @@
           if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data) && data.length) {
-              ALL = data.map(norm);
+              ALL = data.map(mbRow).map(norm);
               setSrc(`EN VIVO desde Metabase · ${data.length.toLocaleString()} equipos`, true);
               renderAll(); return;
             }
