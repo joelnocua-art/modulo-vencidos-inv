@@ -1,4 +1,41 @@
 <!DOCTYPE html>
+<!--
+═══════════════════════════════════════════════════════════════════════════════
+  CertControl · Módulo de Gestión de Vencidos · BIA Energy
+═══════════════════════════════════════════════════════════════════════════════
+
+  QUÉ ES
+    Página independiente (un solo archivo) que vigila el ciclo de vida de la
+    certificación de los equipos: vencimientos, semáforo, alertas preventivas,
+    SLA de laboratorio y candidatos a desasignación. Usa los MISMOS datos
+    reales del inventario, sin tocar el resto del sistema.
+
+  CÓMO INTEGRARLO AL REPOSITORIO (1 paso obligatorio, 1 opcional)
+    1) Copia ESTE archivo (certcontrol.html) a la raíz del repo, junto a
+       index.html. Nada más se modifica.
+    2) (Opcional) Para que sea visible desde el menú, agrega UNA línea en el
+       <div class="nav"> de index.html:
+           <a class="ntab" href="certcontrol.html">Vencidos</a>
+       Es aditivo y reversible: no cambia goTab() ni ninguna pestaña existente.
+
+  ÚNICA DEPENDENCIA DE DATOS
+    mb-data.json (snapshot de Metabase, ya está en el repo). Cadena de respaldo:
+    mb-data.json → mb-data-mini.json → muestra real embebida (64 equipos).
+    Debe servirse por HTTP (GitHub Pages, Netlify o "python3 -m http.server").
+    SheetJS se carga desde CDN solo al subir un Excel; el CSV no requiere red.
+
+  CAPA A — LISTO Y FUNCIONANDO (cliente, datos reales)
+    #1 Alertas preventivas  · ventanas configurables 30/15/7, ruteo Bia/contratista
+    #2 Envíos a lab + SLA    · carga Excel/CSV de envíos, días en lab e incumplimiento
+    #3 Desasignación         · equipos ASIGNADO en riesgo, impacto por sede
+    Config y envíos se guardan en localStorage (cc_cfg, cc_envios).
+
+  CAPA B — PENDIENTE (sin Supabase; Apps Script + Google Sheet)
+    Envío real de correos (cron 7 AM), historial persistente y dedupe.
+    Puntos de enganche: ccSimular() → POST al Web App; SESSIONLOG/pushLog y
+    ENVIOS → fila en la Sheet. No requiere cambios en la Capa A.
+═══════════════════════════════════════════════════════════════════════════════
+-->
 <html lang="es">
 
 <head>
@@ -2093,9 +2130,9 @@
         <span class="ico">⚡</span>
         <div><b>Datos reales</b> del inventario (snapshot de Metabase incluido en el repo). El semáforo, rangos y KPIs
           se calculan con la fecha de hoy. El detalle de un equipo puede <b>refrescarse en vivo</b> desde Metabase si
-          hay API key configurada (Inventario → Admin). Lo que aún requiere backend está marcado con
-          <span class="cc-conn">pendiente</span>: historial persistente, bloqueo automático y alertas (Supabase
-          <code style="font-family:var(--mono)">cc_*</code> + n8n).</div>
+          hay API key configurada (Inventario → Admin). Lo que aún requiere la <b>Capa B</b> está marcado con
+          <span class="cc-conn">pendiente</span>: historial persistente, bloqueo automático y envío de alertas
+          (Apps Script + Google Sheet).</div>
       </div>
 
       <!-- ===== SUB-NAV DEL MÓDULO ===== -->
@@ -2188,7 +2225,7 @@
       <section id="sec-gestion" class="cc-sec" style="display:none">
         <div class="cc-sectitle">Panel de gestión de certificaciones</div>
         <div class="cc-secsub">Estado detallado de un equipo. Puedes refrescar las fechas <b>en vivo desde
-            Metabase</b>. Las acciones de bloqueo y registro quedan en un log local hasta conectar el backend.</div>
+            Metabase</b>. Las acciones de bloqueo y registro quedan en un log local hasta conectar la Capa B (Apps Script + Google Sheet).</div>
         <div style="max-width:340px;margin-bottom:16px">
           <div class="cc-fld" style="margin-bottom:0">
             <label>Buscar equipo por serial</label>
@@ -2323,8 +2360,8 @@
       <section id="sec-auditoria" class="cc-sec" style="display:none">
         <div class="cc-sectitle">Trazabilidad y dashboards de auditoría</div>
         <div class="cc-secsub">El log de abajo registra las acciones de <b>esta sesión</b> (demostración local). El
-          historial persistente y las métricas de efectividad requieren las tablas <code
-            style="font-family:var(--mono)">cc_*</code> en Supabase + workflows n8n.</div>
+          historial persistente y las métricas de efectividad se activan con la <b>Capa B</b>: Apps Script
+            (cron 7 AM) escribiendo en una Google Sheet.</div>
         <div class="cc-grid k2">
           <div class="cc-card">
             <div class="ct"><span class="d" style="background:var(--purple)"></span>Log de actividad (sesión local)
@@ -2454,7 +2491,7 @@
         <div class="cc-money"><div class="big" style="color:#fca5a5">${venc}</div><div class="lbl">vencidos hoy</div></div>
         <div class="cc-money"><div class="big" style="color:var(--info)">${g.length.toLocaleString()}</div><div class="lbl">evaluados</div></div>
       </div>
-      <div>Población gestionable = <b style="color:var(--t1)">Disponible · Asignado · Pendiente certificados</b>, sin accesorios. El bloqueo automático y las alertas escalonadas (30/15/7 días) son el siguiente paso. <span class="cc-conn">pendiente · n8n + Supabase cc_*</span></div>`;
+      <div>Población gestionable = <b style="color:var(--t1)">Disponible · Asignado · Pendiente certificados</b>, sin accesorios. El bloqueo automático y el envío de alertas escalonadas (30/15/7 días) son el siguiente paso. <span class="cc-conn">Capa B · Apps Script + Google Sheet</span></div>`;
     }
 
     /* ===================== EQUIPOS ===================== */
@@ -2534,12 +2571,12 @@
             <div class="cc-fld"><label>Tipo</label><select id="cc-ctipo"><option>Calibración</option><option>Conformidad</option></select></div>
             <div class="cc-fld"><label>Nueva fecha de vencimiento</label><input type="date" id="cc-cfecha"></div>
             <button class="cc-btn go" onclick="ccRegCert()">Registrar</button>
-            <div class="cc-help">Solo se acepta fecha futura. Se persistirá al conectar Supabase <code style="font-family:var(--mono)">cc_certificaciones</code>.</div>
+            <div class="cc-help">Solo se acepta fecha futura. Se persistirá en la Capa B (Google Sheet vía Apps Script).</div>
           </div>
         </div>
         <div class="cc-card">
           <div class="ct"><span class="d" style="background:var(--purple)"></span>Historial (sesión)</div>
-          ${hist.length ? `<div class="cc-tl">${hist.map(l => `<div class="cc-tlrow"><span class="dot" style="background:${l.color}"></span><div class="hd"><span class="ac">${l.ac}</span><span class="tm">${l.t}</span></div><div class="ds">${l.ds}</div></div>`).join('')}</div>` : '<div class="cc-help">Sin movimientos en esta sesión. El historial persistente vive en Supabase <code style="font-family:var(--mono)">cc_bloqueos</code> (pendiente).</div>'}
+          ${hist.length ? `<div class="cc-tl">${hist.map(l => `<div class="cc-tlrow"><span class="dot" style="background:${l.color}"></span><div class="hd"><span class="ac">${l.ac}</span><span class="tm">${l.t}</span></div><div class="ds">${l.ds}</div></div>`).join('')}</div>` : '<div class="cc-help">Sin movimientos en esta sesión. El historial persistente vive en la Capa B (Google Sheet) — pendiente.</div>'}
         </div>
       </div>`;
       document.getElementById('cc-gq').value = e.serial;
@@ -2549,8 +2586,8 @@
     function pushLog(eq, ac, ds, color) { SESSIONLOG.unshift({ eq, ac, ds, color, t: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) }); }
     function ccAct(kind) {
       const e = cur(); if (!e) return;
-      if (kind === 'block') { pushLog(e.serial, 'Bloqueo preventivo', 'Simulado · pendiente Voltio WMS + Supabase', 'var(--danger)'); toast('🔌 Bloqueo simulado · conectar a Voltio WMS / Supabase', 's'); }
-      else { pushLog(e.serial, 'Desbloqueo', 'Simulado · pendiente Voltio WMS + Supabase', 'var(--accent)'); toast('🔌 Desbloqueo simulado · conectar a Voltio WMS / Supabase', 's'); }
+      if (kind === 'block') { pushLog(e.serial, 'Bloqueo preventivo', 'Simulado · pendiente Voltio WMS + Capa B', 'var(--danger)'); toast('🔌 Bloqueo simulado · conectar a Voltio WMS / Capa B', 's'); }
+      else { pushLog(e.serial, 'Desbloqueo', 'Simulado · pendiente Voltio WMS + Capa B', 'var(--accent)'); toast('🔌 Desbloqueo simulado · conectar a Voltio WMS / Capa B', 's'); }
       ccRenderGestion(); ccAudit();
     }
     function ccRegCert() {
@@ -2559,7 +2596,7 @@
       if (!fecha) { toast('Selecciona una fecha de vencimiento', 'e'); return; }
       if (diasA(fecha) <= 0) { toast('La nueva certificación debe tener fecha futura', 'e'); return; }
       pushLog(e.serial, 'Certificación registrada', `${tipo} hasta ${fFecha(fecha)} · simulado`, 'var(--info)');
-      toast('🔌 Certificación registrada (simulado) · conectar Supabase', 's'); ccRenderGestion(); ccAudit();
+      toast('🔌 Certificación registrada (simulado) · conectar Capa B', 's'); ccRenderGestion(); ccAudit();
     }
     async function ccLive() {
       const e = cur(); if (!e) return;
