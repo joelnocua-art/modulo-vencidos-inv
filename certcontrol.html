@@ -2137,7 +2137,8 @@
 
       <!-- ===== SUB-NAV DEL MÓDULO ===== -->
       <div class="cc-subnav">
-        <button class="cc-pillnav active" data-sec="resumen" onclick="ccSec('resumen')">Resumen</button>
+        <button class="cc-pillnav active" data-sec="hoy" onclick="ccSec('hoy')">Hoy</button>
+        <button class="cc-pillnav" data-sec="resumen" onclick="ccSec('resumen')">Resumen</button>
         <button class="cc-pillnav" data-sec="equipos" onclick="ccSec('equipos')">Equipos</button>
         <button class="cc-pillnav" data-sec="gestion" onclick="ccSec('gestion')">Gestión</button>
         <button class="cc-pillnav" data-sec="alertas" onclick="ccSec('alertas')">Alertas</button>
@@ -2146,8 +2147,17 @@
         <button class="cc-pillnav" data-sec="auditoria" onclick="ccSec('auditoria')">Auditoría</button>
       </div>
 
+      <!-- =========================== ACCIONES DE HOY ====================== -->
+      <section id="sec-hoy" class="cc-sec">
+        <div class="cc-sectitle">Acciones de hoy</div>
+        <div class="cc-secsub">Todo lo accionable hoy, priorizado sobre datos reales. Clic en cualquier equipo para
+          abrirlo en <b>Gestión</b>.</div>
+        <div class="cc-grid k4" id="cc-hoy-kpi" style="margin-bottom:1.25rem"></div>
+        <div class="cc-grid k2" id="cc-hoy-cards"></div>
+      </section>
+
       <!-- ============================= RESUMEN ============================= -->
-      <section id="sec-resumen" class="cc-sec">
+      <section id="sec-resumen" class="cc-sec" style="display:none">
         <div class="cc-grid k6" id="cc-kpis"></div>
         <div class="cc-grid k2">
           <div class="cc-card">
@@ -2209,6 +2219,21 @@
             <option value="0-20">0–20 días</option>
             <option value="21-30">21–30 días</option>
             <option value="30+">30+ días</option>
+          </select>
+          <select class="fsel" id="cc-fmarca" onchange="ccRenderTabla()">
+            <option value="">Todas las marcas</option>
+          </select>
+          <select class="fsel" id="cc-ftipo" onchange="ccRenderTabla()">
+            <option value="">Calib. y Conf.</option>
+            <option value="Calibración">Vence Calibración</option>
+            <option value="Conformidad">Vence Conformidad</option>
+          </select>
+          <select class="fsel" id="cc-fseg" onchange="ccRenderTabla()">
+            <option value="">Todos los segmentos</option>
+            <option value="Bia">Bia</option>
+            <option value="Contratista">Contratista</option>
+            <option value="Lab">Laboratorio</option>
+            <option value="Otro">Otro</option>
           </select>
           <button class="cbtn" onclick="ccClear()">Limpiar</button>
         </div>
@@ -2319,9 +2344,9 @@
           </div>
           <div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap">
             <div class="cc-fld" style="margin-bottom:0"><label>SLA METROBIT (días)</label><input type="number"
-                id="cc-slaMB" value="15" min="1" style="width:120px" oninput="ccSaveCfg();ccLab()"></div>
+                id="cc-slaMB" value="15" min="1" style="width:120px" oninput="ccSaveCfg();ccLab();ccHoy()"></div>
             <div class="cc-fld" style="margin-bottom:0"><label>SLA INPEL (días)</label><input type="number"
-                id="cc-slaIN" value="20" min="1" style="width:120px" oninput="ccSaveCfg();ccLab()"></div>
+                id="cc-slaIN" value="20" min="1" style="width:120px" oninput="ccSaveCfg();ccLab();ccHoy()"></div>
           </div>
           <div class="cc-help" style="margin-top:8px">Columnas del archivo: <b>serial</b>, <b>proveedor</b>
             (METROBIT/INPEL) y <b>fecha</b> de envío (acepta 29/05/2026, 2026-05-29 o “mayo 29, 2026”). PDF: carga
@@ -2498,37 +2523,91 @@
       <div>Población gestionable = <b style="color:var(--t1)">Disponible · Asignado · Pendiente certificados</b>, sin accesorios. El bloqueo automático y el envío de alertas escalonadas (30/15/7 días) son el siguiente paso. <span class="cc-conn">Capa B · Apps Script + Google Sheet</span></div>`;
     }
 
+    /* ===================== ACCIONES DE HOY ===================== */
+    function ccHoy() {
+      const g = gestionables();
+      const esc = s => (s + '').replace(/'/g, "\\'");
+      const calibrar = g.filter(e => e._d <= 7 && seg(e.ubic) !== 'Lab').sort((a, b) => a._d - b._d);
+      const programar = g.filter(e => e._d > 7 && e._d <= 30 && seg(e.ubic) !== 'Lab').sort((a, b) => a._d - b._d);
+      const desasig = ALL.filter(e => e.estado === 'ASIGNADO' && !e._acc && e._d != null && e._d < 0).sort((a, b) => a._d - b._d);
+      const nEnv = Object.keys(ENVIOS).length;
+      const sla = [];
+      ALL.filter(e => /INPEL|METROBIT/i.test(e.ubic) && !e._acc).forEach(e => {
+        const x = ENVIOS[e.serial]; if (!x) return;
+        const prov = /METROBIT/i.test(e.ubic) ? 'METROBIT' : 'INPEL';
+        const dd = diasA(x.fecha); if (dd == null) return;
+        const over = (-dd) - (prov === 'METROBIT' ? (CFG.slaMB || 15) : (CFG.slaIN || 20));
+        if (over > 0) sla.push(Object.assign({ _over: over, _lab: -dd }, e));
+      });
+      sla.sort((a, b) => b._over - a._over);
+      const kpi = [
+        ['Calibrar ya', calibrar.length, 'var(--danger)', 'vencidos + ≤7 días'],
+        ['Programar envío', programar.length, 'var(--warn)', '8–30 días'],
+        ['Desasignar', desasig.length, 'var(--purple)', 'asignados vencidos'],
+        ['SLA lab excedido', nEnv ? sla.length : '—', 'var(--info)', nEnv ? 'reclamar al lab' : 'carga envíos en Lab']
+      ];
+      document.getElementById('cc-hoy-kpi').innerHTML = kpi.map(([l, v, c, m]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div><div class="meta">${m}</div></div>`).join('');
+      const row = (e, right) => `<div class="cc-urgrow" onclick="ccSelect('${esc(e.serial)}',true)"><span class="sr">${e.serial}</span><span class="tp">${e.sku} · ${e.ubic}</span><span class="dd" style="color:${right.c}">${right.t}</span></div>`;
+      const card = (title, color, desc, arr, render) => `<div class="cc-card"><div class="ct"><span class="d" style="background:${color}"></span>${title} <span style="color:var(--t3);font-weight:400">· ${arr.length}</span></div>
+        <div class="cc-secsub" style="margin:0 0 10px">${desc}</div>${arr.slice(0, 8).map(render).join('') || '<div class="cc-help">Nada pendiente aquí 🎉</div>'}${arr.length > 8 ? `<div class="cc-help">+${arr.length - 8} más…</div>` : ''}</div>`;
+      document.getElementById('cc-hoy-cards').innerHTML =
+        card('Enviar a calibrar ya', 'var(--danger)', 'Certificado vencido o vence en ≤7 días y no están en laboratorio. Prográmalos hoy.', calibrar, e => row(e, { c: dColor(e._d), t: e._d < 0 ? 'venc.' : '+' + e._d + 'd' })) +
+        card('Programar próximo envío', 'var(--warn)', 'Vencen entre 8 y 30 días. Inclúyelos en la próxima remesa al laboratorio.', programar, e => row(e, { c: dColor(e._d), t: '+' + e._d + 'd' })) +
+        card('Desasignar (en campo, vencidos)', 'var(--purple)', 'Equipos ASIGNADO con certificado vencido: midiendo con certificación no vigente.', desasig, e => row(e, { c: '#fca5a5', t: e._d + 'd' })) +
+        card('SLA de laboratorio excedido', 'var(--info)', nEnv ? 'Llevan más días en el laboratorio que el SLA pactado. Reclama el avance.' : 'Carga el archivo de envíos en la pestaña Laboratorio para activar este cálculo.', sla, e => row(e, { c: 'var(--danger)', t: '+' + e._over + 'd' }));
+    }
+
     /* ===================== EQUIPOS ===================== */
     function ccFillSelects() {
       const byU = {}; ALL.forEach(e => byU[e.ubic] = (byU[e.ubic] || 0) + 1);
       const top = Object.entries(byU).filter(([k]) => k && k !== 'INSTALADO').sort((a, b) => b[1] - a[1]).slice(0, 30);
       const sel = document.getElementById('cc-fub');
       top.forEach(([u, n]) => { const o = document.createElement('option'); o.value = u; o.textContent = `${u} (${n})`; sel.appendChild(o); });
+      const byM = {}; ALL.forEach(e => { if (e.marca) byM[e.marca] = (byM[e.marca] || 0) + 1; });
+      const selM = document.getElementById('cc-fmarca');
+      Object.entries(byM).sort((a, b) => b[1] - a[1]).slice(0, 30).forEach(([m, n]) => { const o = document.createElement('option'); o.value = m; o.textContent = `${m} (${n})`; selM.appendChild(o); });
       const dl = document.getElementById('cc-gqlist');
       dl.innerHTML = gestionables().sort((a, b) => a._d - b._d).slice(0, 400).map(e => `<option value="${e.serial}">`).join('');
+    }
+    let ccSort = { key: 'dias', dir: 1 };
+    function ccSortBy(k) { if (ccSort.key === k) ccSort.dir *= -1; else ccSort = { key: k, dir: 1 }; ccRenderTabla(); }
+    function ccCmp(a, b) {
+      const k = ccSort.key, d = ccSort.dir;
+      const val = e => k === 'dias' ? (e._d == null ? Infinity : e._d)
+        : k === 'venc' ? (e._n ? (parseFecha(e._n.date) || { getTime: () => Infinity }).getTime() : Infinity)
+          : (e[k] || '').toString().toLowerCase();
+      const va = val(a), vb = val(b);
+      return va < vb ? -d : va > vb ? d : 0;
     }
     function ccGetFiltered() {
       const q = document.getElementById('cc-q').value.toLowerCase().trim();
       const fe = document.getElementById('cc-festado').value;
       const fu = document.getElementById('cc-fub').value;
       const fr = document.getElementById('cc-frango').value;
+      const fm = document.getElementById('cc-fmarca').value;
+      const ft = document.getElementById('cc-ftipo').value;
+      const fs = document.getElementById('cc-fseg').value;
       return ALL.filter(e => {
         if (e._acc) return false;
         if (fe === '__GEST__') { if (!GEST.includes(e.estado)) return false; }
         else if (fe) { if (e.estado !== fe) return false; }
         if (fu && e.ubic !== fu) return false;
         if (fr && rKey(e._d) !== fr) return false;
+        if (fm && e.marca !== fm) return false;
+        if (ft && !(e._n && e._n.tipo === ft)) return false;
+        if (fs && seg(e.ubic) !== fs) return false;
         if (q && !(`${e.serial} ${e.sku} ${e.marca} ${e.ubic}`.toLowerCase().includes(q))) return false;
         return true;
-      }).sort((a, b) => (a._d == null ? 1e9 : a._d) - (b._d == null ? 1e9 : b._d));
+      }).sort(ccCmp);
     }
     function ccRenderTabla() {
       const rows = ccGetFiltered();
       const CAP = 300, show = rows.slice(0, CAP);
       document.getElementById('cc-cnt').textContent = rows.length > CAP ? `mostrando ${CAP} de ${rows.length.toLocaleString()} (refina los filtros)` : `${rows.length.toLocaleString()} equipo${rows.length !== 1 ? 's' : ''}`;
       if (!rows.length) { document.getElementById('cc-tabla').innerHTML = '<div class="empty"><h3>Sin resultados</h3><p>Ajusta los filtros</p></div>'; return; }
-      document.getElementById('cc-tabla').innerHTML = `<table><thead><tr>
-        <th>Serial</th><th>SKU</th><th>Estado</th><th>Ubicación</th><th>Próx. venc.</th><th>Días</th><th>Rango</th>
+      const cols = [['serial', 'Serial'], ['sku', 'SKU'], ['estado', 'Estado'], ['ubic', 'Ubicación'], ['venc', 'Próx. venc.'], ['dias', 'Días']];
+      const thead = cols.map(([k, lbl]) => `<th style="cursor:pointer;user-select:none" onclick="ccSortBy('${k}')">${lbl}${ccSort.key === k ? (ccSort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('') + '<th>Rango</th>';
+      document.getElementById('cc-tabla').innerHTML = `<table><thead><tr>${thead}
       </tr></thead><tbody>${show.map(e => `<tr style="cursor:pointer" onclick="ccSelect('${(e.serial + '').replace(/'/g, "\\'")}',true)">
         <td class="mc">${e.serial}</td><td class="nc" title="${e.sku}">${e.sku}</td>
         <td>${estChip(e.estado)}</td>
@@ -2538,7 +2617,7 @@
         <td>${rBadge(e._d)}</td>
       </tr>`).join('')}</tbody></table>`;
     }
-    function ccClear() { document.getElementById('cc-q').value = ''; document.getElementById('cc-festado').value = '__GEST__'; document.getElementById('cc-fub').value = ''; document.getElementById('cc-frango').value = ''; ccRenderTabla(); }
+    function ccClear() { ['cc-q', 'cc-fub', 'cc-frango', 'cc-fmarca', 'cc-ftipo', 'cc-fseg'].forEach(id => document.getElementById(id).value = ''); document.getElementById('cc-festado').value = '__GEST__'; ccSort = { key: 'dias', dir: 1 }; ccRenderTabla(); }
 
     /* ===================== GESTIÓN ===================== */
     let ccSel = null;
@@ -2775,7 +2854,7 @@
       let n = 0;
       rows.slice(1).forEach(r => { const serial = cell(r[col.s]); if (!serial) return; let prov = col.p >= 0 ? cell(r[col.p]).toUpperCase() : ''; prov = /METRO/.test(prov) ? 'METROBIT' : /INPEL/.test(prov) ? 'INPEL' : prov; ENVIOS[serial] = { prov, fecha: cell(r[col.f]) }; n++; });
       localStorage.setItem('cc_envios', JSON.stringify(ENVIOS));
-      toast(`✓ ${n} envíos cargados`, 's'); ccLab();
+      toast(`✓ ${n} envíos cargados`, 's'); ccLab(); ccHoy();
     }
     async function ccUploadEnvios(input) {
       const f = input.files[0]; if (!f) return;
@@ -2801,9 +2880,9 @@
       const labs = ALL.filter(e => /INPEL|METROBIT/i.test(e.ubic) && !e._acc).slice(0, 40);
       labs.forEach((e, i) => { const d = new Date(TODAY); d.setDate(d.getDate() - (5 + (i * 37) % 40)); ENVIOS[e.serial] = { prov: /METRO/i.test(e.ubic) ? 'METROBIT' : 'INPEL', fecha: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }; });
       localStorage.setItem('cc_envios', JSON.stringify(ENVIOS));
-      toast('Ejemplo cargado (fechas de envío ficticias para ver el SLA)', 's'); ccLab();
+      toast('Ejemplo cargado (fechas de envío ficticias para ver el SLA)', 's'); ccLab(); ccHoy();
     }
-    function ccClearEnvios() { ENVIOS = {}; localStorage.removeItem('cc_envios'); toast('Envíos borrados', 's'); ccLab(); }
+    function ccClearEnvios() { ENVIOS = {}; localStorage.removeItem('cc_envios'); toast('Envíos borrados', 's'); ccLab(); ccHoy(); }
 
     /* ===================== NAV / CARGA ===================== */
     function ccSec(name) {
@@ -2824,7 +2903,7 @@
       el.style.borderColor = live ? 'rgba(74,222,128,.25)' : 'rgba(251,191,36,.25)';
       dot.style.background = col; dot.style.boxShadow = `0 0 6px ${col}`;
     }
-    function renderAll() { ccApplyCfg(); ccResumen(); ccFillSelects(); ccRenderTabla(); ccRenderGestion(); ccRenderEmails(); ccAlertas(); ccDesasig(); ccLab(); ccAnalisis(); ccAudit(); }
+    function renderAll() { ccApplyCfg(); ccHoy(); ccResumen(); ccFillSelects(); ccRenderTabla(); ccRenderGestion(); ccRenderEmails(); ccAlertas(); ccDesasig(); ccLab(); ccAnalisis(); ccAudit(); }
 
     async function ccLoad() {
       for (const url of ['mb-data.json', 'mb-data-mini.json']) {
