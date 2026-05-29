@@ -1,0 +1,2798 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="theme-color" content="#4ade80">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Inventario BIA">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CertControl · Gestión de Vencidos · BIA</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --s1: #111418;
+      --s2: #181c22;
+      --s3: #1e242c;
+      --b1: #232930;
+      --b2: #2d3540;
+      --b3: #3a4452;
+      --accent: #4ade80;
+      --accent2: #22c55e;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --info: #60a5fa;
+      --purple: #a78bfa;
+      --t1: #eaecf2;
+      --t2: #8b93a8;
+      --t3: #4d5668;
+      --mono: 'DM Mono', monospace;
+      --sans: 'Syne', sans-serif;
+      --r6: 6px;
+      --r8: 8px;
+      --r12: 12px;
+      --r16: 16px
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--t1);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden
+    }
+
+    /* LOGIN */
+    #login-screen {
+      display: flex;
+      min-height: 100vh;
+      position: relative;
+      overflow: hidden
+    }
+
+    .lbg {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 20% 50%, rgba(74, 222, 128, .06) 0%, transparent 60%), radial-gradient(ellipse 60% 80% at 80% 20%, rgba(96, 165, 250, .04) 0%, transparent 60%)
+    }
+
+    .lgrid {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(var(--b1) 1px, transparent 1px), linear-gradient(90deg, var(--b1) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: .4
+    }
+
+    .lleft {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 4rem;
+      position: relative;
+      z-index: 1
+    }
+
+    .ldot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 20px var(--accent);
+      display: inline-block;
+      margin-right: 10px;
+      animation: glow 2s infinite;
+      vertical-align: middle
+    }
+
+    @keyframes glow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 20px var(--accent)
+      }
+
+      50% {
+        box-shadow: 0 0 40px var(--accent), 0 0 60px rgba(74, 222, 128, .3)
+      }
+    }
+
+    .lbrand-name {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      vertical-align: middle
+    }
+
+    .lbrand-sub {
+      font-size: 12px;
+      color: var(--t3);
+      font-family: var(--mono);
+      margin-top: 6px;
+      margin-left: 22px
+    }
+
+    .ltagline {
+      font-size: 40px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 2rem 0 1rem;
+      max-width: 380px
+    }
+
+    .ltagline span {
+      color: var(--accent)
+    }
+
+    .ldesc {
+      font-size: 14px;
+      color: var(--t2);
+      line-height: 1.7;
+      max-width: 340px
+    }
+
+    .lright {
+      width: 420px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      position: relative;
+      z-index: 1
+    }
+
+    .lcard {
+      background: var(--s1);
+      border: 1px solid var(--b2);
+      border-radius: var(--r16);
+      padding: 2.5rem;
+      width: 100%
+    }
+
+    .ltitle {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px
+    }
+
+    .lsub {
+      font-size: 13px;
+      color: var(--t2);
+      margin-bottom: 2rem
+    }
+
+    .field {
+      margin-bottom: 1.25rem
+    }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      color: var(--t2);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-family: var(--mono);
+      margin-bottom: 7px
+    }
+
+    .field input {
+      width: 100%;
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      padding: 11px 14px;
+      font-size: 14px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      transition: border-color .2s
+    }
+
+    .field input:focus {
+      border-color: var(--accent)
+    }
+
+    .field input::placeholder {
+      color: var(--t3)
+    }
+
+    .lbtn {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #0b0d10;
+      border: none;
+      border-radius: var(--r8);
+      font-size: 14px;
+      font-weight: 700;
+      font-family: var(--sans);
+      cursor: pointer;
+      transition: all .2s;
+      letter-spacing: .04em
+    }
+
+    .lbtn:hover {
+      background: var(--accent2);
+      transform: translateY(-1px)
+    }
+
+    .lerr {
+      font-size: 12px;
+      color: var(--danger);
+      margin-top: 10px;
+      text-align: center;
+      font-family: var(--mono);
+      display: none
+    }
+
+    .lerr.show {
+      display: block
+    }
+
+    @media(max-width:768px) {
+      .lleft {
+        display: none
+      }
+
+      .lright {
+        width: 100%
+      }
+    }
+
+    /* APP */
+    #app-screen {
+      display: none;
+      flex-direction: column;
+      min-height: 100vh
+    }
+
+    /* HEADER */
+    .hdr {
+      background: var(--s1);
+      border-bottom: 1px solid var(--b1);
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+      position: sticky;
+      top: 0;
+      z-index: 100
+    }
+
+    .hlogo {
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .hdot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: glow 2s infinite
+    }
+
+    .hname {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase
+    }
+
+    .hright {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .uchip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--s2);
+      border: 1px solid var(--b1);
+      border-radius: 20px;
+      padding: 5px 12px 5px 5px;
+      font-size: 12px;
+      color: var(--t2)
+    }
+
+    .uav {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0
+    }
+
+    .av-admin {
+      background: rgba(167, 139, 250, .2);
+      color: var(--purple)
+    }
+
+    .av-op {
+      background: rgba(74, 222, 128, .15);
+      color: var(--accent)
+    }
+
+    .rbadge {
+      font-size: 10px;
+      font-family: var(--mono);
+      padding: 2px 7px;
+      border-radius: 10px
+    }
+
+    .rb-admin {
+      background: rgba(167, 139, 250, .15);
+      color: var(--purple)
+    }
+
+    .rb-op {
+      background: rgba(74, 222, 128, .12);
+      color: var(--accent)
+    }
+
+    .lout {
+      font-size: 12px;
+      padding: 5px 12px;
+      border: 1px solid var(--b2);
+      border-radius: var(--r6);
+      background: transparent;
+      color: var(--t3);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .lout:hover {
+      border-color: var(--danger);
+      color: var(--danger)
+    }
+
+    /* NAV */
+    .nav {
+      background: var(--s1);
+      border-bottom: 1px solid var(--b1);
+      padding: 0 1.5rem;
+      display: flex;
+      overflow-x: auto
+    }
+
+    .ntab {
+      padding: 13px 18px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--t3);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      background: none;
+      font-family: var(--sans);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      transition: color .2s
+    }
+
+    .ntab:hover {
+      color: var(--t2)
+    }
+
+    .ntab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent)
+    }
+
+    .ntab.hidden {
+      display: none
+    }
+
+    /* MAIN */
+    .main {
+      padding: 1.5rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%
+    }
+
+    /* STATS */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 1.5rem
+    }
+
+    .sc {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 1.1rem 1.25rem;
+      cursor: pointer;
+      transition: border-color .2s
+    }
+
+    .sc:hover {
+      border-color: var(--b2)
+    }
+
+    .sc.on {
+      border-color: var(--accent)
+    }
+
+    .sc-lbl {
+      font-size: 10px;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-family: var(--mono);
+      margin-bottom: 7px
+    }
+
+    .sc-val {
+      font-size: 28px;
+      font-weight: 800
+    }
+
+    .v-blue {
+      color: var(--info)
+    }
+
+    .v-green {
+      color: var(--accent)
+    }
+
+    .v-yellow {
+      color: var(--warn)
+    }
+
+    .v-purple {
+      color: var(--purple)
+    }
+
+    /* FILTERS */
+    .fbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 1.1rem;
+      flex-wrap: wrap;
+      align-items: center
+    }
+
+    .srch {
+      position: relative;
+      flex: 1;
+      min-width: 180px
+    }
+
+    .srch svg {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--t3);
+      pointer-events: none
+    }
+
+    .srch input {
+      width: 100%;
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r8);
+      padding: 9px 12px 9px 34px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      transition: border-color .2s
+    }
+
+    .srch input:focus {
+      border-color: var(--accent)
+    }
+
+    .srch input::placeholder {
+      color: var(--t3)
+    }
+
+    select.fsel {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r8);
+      padding: 9px 12px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      cursor: pointer
+    }
+
+    select.fsel:focus {
+      border-color: var(--accent)
+    }
+
+    .cbtn {
+      font-size: 12px;
+      padding: 8px 13px;
+      border: 1px solid var(--b1);
+      border-radius: var(--r8);
+      background: transparent;
+      color: var(--t3);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .cbtn:hover {
+      border-color: var(--b2);
+      color: var(--t1)
+    }
+
+    .pbtn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      padding: 9px 16px;
+      border: none;
+      border-radius: var(--r8);
+      background: var(--accent);
+      color: #0b0d10;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700;
+      transition: all .2s
+    }
+
+    .pbtn:hover {
+      background: var(--accent2)
+    }
+
+    /* TABLE */
+    .twrap {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      overflow: hidden
+    }
+
+    .thead2 {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--b1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between
+    }
+
+    .tcnt {
+      font-size: 11px;
+      color: var(--t3);
+      font-family: var(--mono)
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 10px;
+      color: var(--t3);
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      font-family: var(--mono);
+      border-bottom: 1px solid var(--b1);
+      background: var(--s2);
+      cursor: pointer;
+      white-space: nowrap
+    }
+
+    th:hover {
+      color: var(--t2)
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--b1);
+      font-size: 13px;
+      vertical-align: middle
+    }
+
+    tr:last-child td {
+      border-bottom: none
+    }
+
+    tr:hover td {
+      background: var(--s2)
+    }
+
+    .mc {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--info);
+      font-weight: 500
+    }
+
+    .nc {
+      color: var(--t1);
+      max-width: 200px;
+      font-size: 12px;
+      line-height: 1.4
+    }
+
+    .uc {
+      font-size: 12px;
+      color: var(--t2);
+      display: flex;
+      align-items: center;
+      gap: 4px
+    }
+
+    .ec {
+      font-size: 11px;
+      color: var(--t3);
+      font-family: var(--mono)
+    }
+
+    /* BADGES */
+    .bdg {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-weight: 600;
+      letter-spacing: .03em;
+      font-family: var(--mono)
+    }
+
+    .bdg-disp {
+      background: rgba(74, 222, 128, .1);
+      color: var(--accent);
+      border: 1px solid rgba(74, 222, 128, .2)
+    }
+
+    .bdg-pend {
+      background: rgba(251, 191, 36, .1);
+      color: var(--warn);
+      border: 1px solid rgba(251, 191, 36, .2)
+    }
+
+    .bdg-inst {
+      background: rgba(96, 165, 250, .1);
+      color: var(--info);
+      border: 1px solid rgba(96, 165, 250, .2)
+    }
+
+    .bdot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0
+    }
+
+    .bdg-disp .bdot {
+      background: var(--accent)
+    }
+
+    .bdg-pend .bdot {
+      background: var(--warn)
+    }
+
+    .bdg-inst .bdot {
+      background: var(--info)
+    }
+
+    /* BTNS */
+    .sbtn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      padding: 6px 12px;
+      border: 1px solid var(--b1);
+      border-radius: var(--r6);
+      background: transparent;
+      color: var(--t2);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .sbtn:hover {
+      border-color: var(--b2);
+      color: var(--t1)
+    }
+
+    /* EMPTY/LOADING */
+    .empty {
+      text-align: center;
+      padding: 3.5rem 2rem;
+      color: var(--t3)
+    }
+
+    .empty h3 {
+      font-size: 15px;
+      color: var(--t2);
+      margin-bottom: 5px
+    }
+
+    .spin {
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--b2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 12px
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .loading {
+      text-align: center;
+      padding: 3.5rem;
+      color: var(--t2);
+      font-size: 13px
+    }
+
+    /* PFORM */
+    .pform {
+      max-width: 560px;
+      margin: 0 auto
+    }
+
+    .pcard {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 1.75rem;
+      margin-bottom: 1rem
+    }
+
+    .flbl {
+      display: block;
+      font-size: 10px;
+      color: var(--t2);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-family: var(--mono);
+      margin-bottom: 6px
+    }
+
+    .flbl span {
+      color: var(--danger)
+    }
+
+    .finp {
+      width: 100%;
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      padding: 10px 13px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      transition: border-color .2s
+    }
+
+    .finp:focus {
+      border-color: var(--accent)
+    }
+
+    .finp::placeholder {
+      color: var(--t3)
+    }
+
+    .fsel2 {
+      width: 100%;
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      padding: 10px 13px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      cursor: pointer
+    }
+
+    .fsel2:focus {
+      border-color: var(--accent)
+    }
+
+    .fgrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px
+    }
+
+    .fg {
+      display: flex;
+      flex-direction: column;
+      gap: 6px
+    }
+
+    .phzone {
+      border: 2px dashed var(--b2);
+      border-radius: var(--r8);
+      padding: 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s;
+      position: relative;
+      overflow: hidden
+    }
+
+    .phzone:hover {
+      border-color: var(--accent)
+    }
+
+    .phzone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer
+    }
+
+    .phprev {
+      width: 100%;
+      max-height: 160px;
+      object-fit: cover;
+      border-radius: var(--r6);
+      display: none
+    }
+
+    .phph {
+      color: var(--t3);
+      font-size: 13px
+    }
+
+    .cambtn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      margin-top: 8px;
+      font-size: 12px;
+      padding: 8px;
+      border: 1px solid var(--b2);
+      border-radius: var(--r6);
+      background: transparent;
+      color: var(--t2);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .cambtn:hover {
+      border-color: var(--b3);
+      color: var(--t1)
+    }
+
+    .savebtn {
+      font-size: 13px;
+      padding: 10px 22px;
+      border: none;
+      border-radius: var(--r8);
+      background: var(--accent);
+      color: #0b0d10;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700;
+      transition: all .2s
+    }
+
+    .savebtn:hover {
+      background: var(--accent2)
+    }
+
+    .savebtn:disabled {
+      opacity: .4;
+      cursor: not-allowed
+    }
+
+    .cncl {
+      font-size: 13px;
+      padding: 10px 18px;
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      background: transparent;
+      color: var(--t2);
+      cursor: pointer;
+      font-family: var(--sans)
+    }
+
+    /* AUDIT */
+    .aitem {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 1rem 1.25rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px
+    }
+
+    .aitem:hover {
+      border-color: var(--b2)
+    }
+
+    .adot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-top: 5px;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px var(--accent)
+    }
+
+    .aser {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--info);
+      font-weight: 500;
+      margin-bottom: 3px
+    }
+
+    .ainf {
+      font-size: 13px;
+      color: var(--t1);
+      line-height: 1.5
+    }
+
+    .atim {
+      font-size: 10px;
+      color: var(--t3);
+      font-family: var(--mono);
+      margin-top: 4px
+    }
+
+    .autag {
+      font-size: 10px;
+      font-family: var(--mono);
+      background: rgba(167, 139, 250, .12);
+      color: var(--purple);
+      padding: 1px 7px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-left: 6px
+    }
+
+    .aph {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: var(--r6);
+      margin-left: auto;
+      flex-shrink: 0
+    }
+
+    /* ADMIN */
+    .agrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem
+    }
+
+    .acard {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 1.5rem
+    }
+
+    .actitle {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--t2);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: 1.25rem
+    }
+
+    .urow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--b1)
+    }
+
+    .urow:last-child {
+      border-bottom: none
+    }
+
+    .uname {
+      font-size: 13px;
+      font-weight: 600;
+      flex: 1
+    }
+
+    .ubodega {
+      font-size: 11px;
+      color: var(--t3);
+      font-family: var(--mono)
+    }
+
+    .urole {
+      font-size: 10px;
+      font-family: var(--mono);
+      padding: 2px 8px;
+      border-radius: 10px
+    }
+
+    .ur-admin {
+      background: rgba(167, 139, 250, .15);
+      color: var(--purple)
+    }
+
+    .ur-op {
+      background: rgba(74, 222, 128, .12);
+      color: var(--accent)
+    }
+
+    .delbtn {
+      font-size: 11px;
+      padding: 3px 8px;
+      border: 1px solid var(--b2);
+      border-radius: var(--r6);
+      background: transparent;
+      color: var(--t3);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .delbtn:hover {
+      border-color: var(--danger);
+      color: var(--danger)
+    }
+
+    .addform {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--b1)
+    }
+
+    .mini {
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r6);
+      padding: 8px 10px;
+      font-size: 12px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      width: 100%
+    }
+
+    .mini:focus {
+      border-color: var(--accent)
+    }
+
+    .addbtn {
+      font-size: 12px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: var(--r6);
+      background: var(--accent);
+      color: #0b0d10;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700
+    }
+
+    .addbtn:hover {
+      background: var(--accent2)
+    }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r12);
+      padding: 12px 18px;
+      font-size: 13px;
+      color: var(--t1);
+      z-index: 500;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      max-width: 300px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .4)
+    }
+
+    .toast.show {
+      display: flex;
+      animation: slide .3s ease
+    }
+
+    .toast.s {
+      border-color: var(--accent)
+    }
+
+    .toast.e {
+      border-color: var(--danger)
+    }
+
+    .tdot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0
+    }
+
+    .toast.s .tdot {
+      background: var(--accent)
+    }
+
+    .toast.e .tdot {
+      background: var(--danger)
+    }
+
+    @keyframes slide {
+      from {
+        transform: translateY(16px);
+        opacity: 0
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1
+      }
+    }
+
+    .saving {
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--warn);
+      display: none;
+      align-items: center;
+      gap: 6px
+    }
+
+    .saving.show {
+      display: flex
+    }
+
+    @media(max-width:768px) {
+      .stats {
+        grid-template-columns: 1fr 1fr
+      }
+
+      .main {
+        padding: 1rem
+      }
+
+      .fgrid {
+        grid-template-columns: 1fr
+      }
+
+      .agrid {
+        grid-template-columns: 1fr
+      }
+
+      table {
+        font-size: 12px
+      }
+
+      td,
+      th {
+        padding: 8px 10px
+      }
+    }
+
+    /* ===================================================================== */
+    /* ===== CERTCONTROL · MÓDULO DE VENCIDOS (maqueta, sin conexión) ====== */
+    /* ===================================================================== */
+    a.ntab,
+    a.lout {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center
+    }
+
+    .cc-pill {
+      margin-left: 10px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(74, 222, 128, .12);
+      border: 1px solid rgba(74, 222, 128, .3);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: .06em;
+      text-transform: uppercase
+    }
+
+    .cc-demo {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--warn);
+      background: rgba(251, 191, 36, .1);
+      border: 1px solid rgba(251, 191, 36, .25);
+      padding: 5px 10px;
+      border-radius: 999px;
+      letter-spacing: .04em
+    }
+
+    .cc-demo::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--warn);
+      box-shadow: 0 0 6px var(--warn)
+    }
+
+    .cc-hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-bottom: 1.25rem
+    }
+
+    .cc-hero h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -.01em
+    }
+
+    .cc-hero .sub {
+      font-size: 13px;
+      color: var(--t2);
+      margin-top: 5px;
+      max-width: 580px;
+      line-height: 1.6
+    }
+
+    .cc-int {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: rgba(96, 165, 250, .07);
+      border: 1px solid rgba(96, 165, 250, .22);
+      border-radius: var(--r12);
+      padding: 12px 14px;
+      font-size: 12px;
+      color: var(--t2);
+      line-height: 1.6;
+      margin-bottom: 1.5rem
+    }
+
+    .cc-int b {
+      color: var(--info)
+    }
+
+    .cc-int .ico {
+      flex-shrink: 0;
+      font-size: 15px
+    }
+
+    .cc-subnav {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--b1)
+    }
+
+    .cc-pillnav {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--t2);
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 13px;
+      cursor: pointer;
+      transition: all .15s;
+      margin-bottom: -1px
+    }
+
+    .cc-pillnav:hover {
+      color: var(--t1)
+    }
+
+    .cc-pillnav.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent)
+    }
+
+    .cc-grid {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 1.5rem
+    }
+
+    .cc-grid.k6 {
+      grid-template-columns: repeat(6, 1fr)
+    }
+
+    .cc-grid.k4 {
+      grid-template-columns: repeat(4, 1fr)
+    }
+
+    .cc-grid.k3 {
+      grid-template-columns: repeat(3, 1fr)
+    }
+
+    .cc-grid.k2 {
+      grid-template-columns: 1fr 1fr
+    }
+
+    @media (max-width:1100px) {
+      .cc-grid.k6 {
+        grid-template-columns: repeat(3, 1fr)
+      }
+
+      .cc-grid.k4 {
+        grid-template-columns: repeat(2, 1fr)
+      }
+    }
+
+    @media (max-width:680px) {
+
+      .cc-grid.k6,
+      .cc-grid.k4,
+      .cc-grid.k3,
+      .cc-grid.k2 {
+        grid-template-columns: 1fr 1fr
+      }
+    }
+
+    .cc-kpi {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 16px;
+      position: relative;
+      overflow: hidden
+    }
+
+    .cc-kpi .strip {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px
+    }
+
+    .cc-kpi .lbl {
+      font-size: 10px;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      font-family: var(--mono);
+      margin-bottom: 10px
+    }
+
+    .cc-kpi .val {
+      font-size: 27px;
+      font-weight: 800;
+      font-family: var(--mono);
+      line-height: 1
+    }
+
+    .cc-kpi .meta {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 8px
+    }
+
+    .cc-card {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 18px
+    }
+
+    .cc-card .ct {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-family: var(--mono);
+      color: var(--t2);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 7px
+    }
+
+    .cc-card .ct .d {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%
+    }
+
+    .cc-sem {
+      display: flex;
+      border-radius: var(--r8);
+      overflow: hidden;
+      height: 34px;
+      margin-bottom: 12px;
+      border: 1px solid var(--b1)
+    }
+
+    .cc-sem .seg {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: #0b0d10
+    }
+
+    .cc-semleg {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--t2)
+    }
+
+    .cc-semleg span {
+      display: flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .cc-semleg i {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      display: inline-block
+    }
+
+    .cc-ring {
+      display: flex;
+      align-items: center;
+      gap: 14px
+    }
+
+    .cc-ring .big {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: var(--mono);
+      color: var(--accent);
+      line-height: 1
+    }
+
+    .cc-ring .rl {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 3px;
+      max-width: 110px;
+      line-height: 1.4
+    }
+
+    .cc-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--mono);
+      white-space: nowrap
+    }
+
+    .cc-chip .dt {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%
+    }
+
+    .ch-ok {
+      background: rgba(74, 222, 128, .12);
+      color: var(--accent)
+    }
+
+    .ch-ok .dt {
+      background: var(--accent)
+    }
+
+    .ch-alert {
+      background: rgba(251, 191, 36, .13);
+      color: var(--warn)
+    }
+
+    .ch-alert .dt {
+      background: var(--warn)
+    }
+
+    .ch-cal {
+      background: rgba(96, 165, 250, .13);
+      color: var(--info)
+    }
+
+    .ch-cal .dt {
+      background: var(--info)
+    }
+
+    .ch-ot {
+      background: rgba(167, 139, 250, .14);
+      color: var(--purple)
+    }
+
+    .ch-ot .dt {
+      background: var(--purple)
+    }
+
+    .ch-block {
+      background: rgba(248, 113, 113, .13);
+      color: var(--danger)
+    }
+
+    .ch-block .dt {
+      background: var(--danger)
+    }
+
+    .ch-exp {
+      background: rgba(248, 113, 113, .22);
+      color: #fca5a5
+    }
+
+    .ch-exp .dt {
+      background: #fca5a5
+    }
+
+    .cc-r {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: var(--r6);
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--mono)
+    }
+
+    .r-exp {
+      background: rgba(248, 113, 113, .2);
+      color: #fca5a5
+    }
+
+    .r-crit {
+      background: rgba(248, 113, 113, .12);
+      color: var(--danger)
+    }
+
+    .r-20 {
+      background: rgba(251, 191, 36, .13);
+      color: var(--warn)
+    }
+
+    .r-30 {
+      background: rgba(96, 165, 250, .12);
+      color: var(--info)
+    }
+
+    .r-ok {
+      background: rgba(74, 222, 128, .1);
+      color: var(--accent)
+    }
+
+    .cc-urg {
+      display: flex;
+      flex-direction: column
+    }
+
+    .cc-urgrow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--b1);
+      cursor: pointer;
+      transition: .12s
+    }
+
+    .cc-urgrow:last-child {
+      border-bottom: none
+    }
+
+    .cc-urgrow:hover {
+      background: var(--s2);
+      margin: 0 -10px;
+      padding-left: 10px;
+      padding-right: 10px;
+      border-radius: var(--r8);
+      border-bottom-color: transparent
+    }
+
+    .cc-urgrow .sr {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--t1);
+      min-width: 76px
+    }
+
+    .cc-urgrow .tp {
+      font-size: 12px;
+      color: var(--t2);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .cc-urgrow .dd {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      min-width: 54px;
+      text-align: right
+    }
+
+    .cc-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    .cc-barrow {
+      display: grid;
+      grid-template-columns: 140px 1fr 58px;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px
+    }
+
+    .cc-barrow .nm {
+      color: var(--t2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .cc-track {
+      height: 8px;
+      background: var(--s3);
+      border-radius: 99px;
+      overflow: hidden
+    }
+
+    .cc-fill {
+      height: 100%;
+      border-radius: 99px
+    }
+
+    .cc-barrow .vv {
+      font-family: var(--mono);
+      text-align: right;
+      color: var(--t1)
+    }
+
+    .cc-tl {
+      position: relative;
+      padding-left: 20px
+    }
+
+    .cc-tl::before {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 4px;
+      bottom: 4px;
+      width: 1px;
+      background: var(--b2)
+    }
+
+    .cc-tlrow {
+      position: relative;
+      padding: 0 0 16px 0
+    }
+
+    .cc-tlrow:last-child {
+      padding-bottom: 0
+    }
+
+    .cc-tlrow .dot {
+      position: absolute;
+      left: -18px;
+      top: 3px;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 2px solid var(--bg)
+    }
+
+    .cc-tlrow .hd {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px
+    }
+
+    .cc-tlrow .ac {
+      font-weight: 600;
+      color: var(--t1)
+    }
+
+    .cc-tlrow .tm {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--t3);
+      white-space: nowrap
+    }
+
+    .cc-tlrow .ds {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 3px;
+      line-height: 1.5
+    }
+
+    .cc-lab {
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    .cc-labrow {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 14px
+    }
+
+    .cc-labrow .prov {
+      width: 52px;
+      height: 52px;
+      border-radius: var(--r8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 13px;
+      flex-shrink: 0
+    }
+
+    .cc-labrow .info {
+      flex: 1;
+      min-width: 0
+    }
+
+    .cc-labrow .info .t {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--t1)
+    }
+
+    .cc-labrow .info .s {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 3px
+    }
+
+    .cc-labrow .sla {
+      text-align: right;
+      font-family: var(--mono);
+      font-size: 11px;
+      white-space: nowrap
+    }
+
+    .cc-money .big {
+      font-size: 25px;
+      font-weight: 800;
+      font-family: var(--mono);
+      line-height: 1
+    }
+
+    .cc-money .lbl {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 5px
+    }
+
+    .cc-det {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 16px
+    }
+
+    @media (max-width:880px) {
+      .cc-det {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .cc-kv {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--b1)
+    }
+
+    .cc-kv:last-child {
+      border-bottom: none
+    }
+
+    .cc-kv .k {
+      color: var(--t3)
+    }
+
+    .cc-kv .v {
+      color: var(--t1);
+      font-family: var(--mono);
+      text-align: right
+    }
+
+    .cc-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px
+    }
+
+    .cc-btn {
+      border: 1px solid var(--b2);
+      background: var(--s2);
+      color: var(--t1);
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 9px 13px;
+      border-radius: var(--r8);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: .15s
+    }
+
+    .cc-btn:hover {
+      border-color: var(--b3);
+      background: var(--s3)
+    }
+
+    .cc-btn.danger {
+      border-color: rgba(248, 113, 113, .3);
+      color: var(--danger)
+    }
+
+    .cc-btn.danger:hover {
+      background: rgba(248, 113, 113, .08)
+    }
+
+    .cc-btn.go {
+      background: var(--accent);
+      color: #0b0d10;
+      border-color: var(--accent)
+    }
+
+    .cc-btn.go:hover {
+      background: var(--accent2)
+    }
+
+    .cc-conn {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--t3);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--s2);
+      border: 1px dashed var(--b2);
+      padding: 2px 8px;
+      border-radius: 99px;
+      white-space: nowrap
+    }
+
+    .cc-conn::before {
+      content: '🔌';
+      font-size: 9px
+    }
+
+    .cc-dash {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 16px;
+      display: flex;
+      flex-direction: column
+    }
+
+    .cc-dash .dt {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 4px
+    }
+
+    .cc-dash .dd {
+      font-size: 11px;
+      color: var(--t2);
+      line-height: 1.5;
+      margin-bottom: 14px
+    }
+
+    .cc-dash .mini {
+      margin-top: auto
+    }
+
+    .cc-mini-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--b1)
+    }
+
+    .cc-mini-row:last-of-type {
+      border-bottom: none
+    }
+
+    .cc-mini-row .mv {
+      font-family: var(--mono);
+      color: var(--t1)
+    }
+
+    .cc-help {
+      font-size: 11px;
+      color: var(--t3);
+      font-family: var(--mono);
+      margin-top: 8px;
+      line-height: 1.5
+    }
+
+    .cc-fld {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px
+    }
+
+    .cc-fld label {
+      font-size: 11px;
+      color: var(--t2);
+      font-weight: 600
+    }
+
+    .cc-fld input,
+    .cc-fld select {
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none
+    }
+
+    .cc-fld input:focus,
+    .cc-fld select:focus {
+      border-color: var(--accent)
+    }
+
+    .cc-sectitle {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 4px
+    }
+
+    .cc-secsub {
+      font-size: 12px;
+      color: var(--t2);
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+      max-width: 640px
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app-screen" style="display:block">
+
+    <!-- ===== HEADER (mismo chrome del Inventario) ===== -->
+    <div class="hdr">
+      <div class="hlogo">
+        <div class="hdot"></div>
+        <div class="hname">Inventario BIA</div>
+        <span class="cc-pill">CertControl</span>
+      </div>
+      <div class="hright">
+        <span id="cc-src"
+          style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;padding:5px 10px;border-radius:999px;letter-spacing:.04em;color:var(--warn);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25)">
+          <span id="cc-srcdot"
+            style="width:6px;height:6px;border-radius:50%;background:var(--warn);box-shadow:0 0 6px var(--warn)"></span>
+          <span id="cc-srctxt">Cargando datos…</span>
+        </span>
+        <div class="uchip">
+          <div class="uav av-admin">SC</div>
+          <span>Supply Control</span>
+          <span class="rbadge rb-admin">SUPPLY</span>
+        </div>
+        <a class="lout" href="index.html">← Inventario</a>
+      </div>
+    </div>
+
+    <!-- ===== NAV: las demás pestañas vuelven al index; Vencidos activo ===== -->
+    <div class="nav">
+      <a class="ntab" href="index.html">Conteo</a>
+      <a class="ntab" href="index.html">Pistolear</a>
+      <a class="ntab" href="index.html">Admin</a>
+      <a class="ntab" href="index.html">Inventarios</a>
+      <a class="ntab" href="index.html">About</a>
+      <button class="ntab active">Vencidos</button>
+    </div>
+
+    <div class="main">
+
+      <!-- ===== HERO ===== -->
+      <div class="cc-hero">
+        <div>
+          <h1>CertControl · Ciclo de vida de certificaciones</h1>
+          <div class="sub">Semáforo de vencimientos calculado <b style="color:var(--t1)">en vivo</b> sobre el inventario
+            real. Población gestionable: <b style="color:var(--t1)">Disponible · Asignado · Pendiente
+              certificados</b> (excluye instalados, averiados y accesorios), igual que el tab “Equipos Vencidos”.</div>
+        </div>
+        <div class="cc-ring" id="cc-heroring"></div>
+      </div>
+
+      <!-- ===== AVISO DE ALCANCE ===== -->
+      <div class="cc-int">
+        <span class="ico">⚡</span>
+        <div><b>Datos reales</b> del inventario (snapshot de Metabase incluido en el repo). El semáforo, rangos y KPIs
+          se calculan con la fecha de hoy. El detalle de un equipo puede <b>refrescarse en vivo</b> desde Metabase si
+          hay API key configurada (Inventario → Admin). Lo que aún requiere backend está marcado con
+          <span class="cc-conn">pendiente</span>: historial persistente, bloqueo automático y alertas (Supabase
+          <code style="font-family:var(--mono)">cc_*</code> + n8n).</div>
+      </div>
+
+      <!-- ===== SUB-NAV DEL MÓDULO ===== -->
+      <div class="cc-subnav">
+        <button class="cc-pillnav active" data-sec="resumen" onclick="ccSec('resumen')">Resumen</button>
+        <button class="cc-pillnav" data-sec="equipos" onclick="ccSec('equipos')">Equipos</button>
+        <button class="cc-pillnav" data-sec="gestion" onclick="ccSec('gestion')">Gestión</button>
+        <button class="cc-pillnav" data-sec="alertas" onclick="ccSec('alertas')">Alertas</button>
+        <button class="cc-pillnav" data-sec="lab" onclick="ccSec('lab')">Laboratorio</button>
+        <button class="cc-pillnav" data-sec="analisis" onclick="ccSec('analisis')">Análisis</button>
+        <button class="cc-pillnav" data-sec="auditoria" onclick="ccSec('auditoria')">Auditoría</button>
+      </div>
+
+      <!-- ============================= RESUMEN ============================= -->
+      <section id="sec-resumen" class="cc-sec">
+        <div class="cc-grid k6" id="cc-kpis"></div>
+        <div class="cc-grid k2">
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--warn)"></span>Semáforo de vencimientos</div>
+            <div class="cc-sem" id="cc-sem"></div>
+            <div class="cc-semleg" id="cc-semleg"></div>
+            <div class="cc-help">Rangos del tab “Equipos Vencidos”: Vencido · 0–20 · 21–30 · 30+ días. Toma el
+              vencimiento más próximo entre Calibración y Conformidad.</div>
+          </div>
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--danger)"></span>Requieren acción (más urgentes)
+            </div>
+            <div class="cc-urg" id="cc-urg"></div>
+          </div>
+        </div>
+        <div class="cc-grid k2">
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--info)"></span>Carga por ubicación (gestionables)
+            </div>
+            <div class="cc-bars" id="cc-bars"></div>
+          </div>
+          <div class="cc-card" style="background:linear-gradient(135deg,var(--s1),rgba(74,222,128,.045))">
+            <div class="ct"><span class="d" style="background:var(--accent)"></span>Cobertura y alcance</div>
+            <div id="cc-cov" style="font-size:13px;color:var(--t2);line-height:1.7"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================= EQUIPOS ============================= -->
+      <section id="sec-equipos" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Equipos en seguimiento</div>
+        <div class="cc-secsub">Días a vencer y rango por equipo (inventario real). Clic en una fila para abrirla en
+          <b>Gestión</b>.</div>
+        <div class="fbar">
+          <div class="srch">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <input type="text" id="cc-q" placeholder="Buscar serial, SKU, marca, ubicación…" oninput="ccRenderTabla()">
+          </div>
+          <select class="fsel" id="cc-festado" onchange="ccRenderTabla()">
+            <option value="__GEST__">Gestionables</option>
+            <option value="">Todos los estados</option>
+            <option>DISPONIBLE</option>
+            <option>ASIGNADO</option>
+            <option>PENDIENTE CERTIFICADOS</option>
+            <option>INSTALADO</option>
+            <option>AVERIADO</option>
+            <option>NO ENCONTRADO</option>
+            <option>VENDIDO</option>
+          </select>
+          <select class="fsel" id="cc-fub" onchange="ccRenderTabla()">
+            <option value="">Todas las ubicaciones</option>
+          </select>
+          <select class="fsel" id="cc-frango" onchange="ccRenderTabla()">
+            <option value="">Todos los rangos</option>
+            <option value="exp">Vencido</option>
+            <option value="0-20">0–20 días</option>
+            <option value="21-30">21–30 días</option>
+            <option value="30+">30+ días</option>
+          </select>
+          <button class="cbtn" onclick="ccClear()">Limpiar</button>
+        </div>
+        <div class="twrap">
+          <div class="thead2">
+            <div class="tcnt" id="cc-cnt">— equipos</div>
+            <span class="cc-conn">origen: mb-data.json (snapshot Metabase)</span>
+          </div>
+          <div id="cc-tabla"></div>
+        </div>
+      </section>
+
+      <!-- ============================= GESTIÓN ============================= -->
+      <section id="sec-gestion" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Panel de gestión de certificaciones</div>
+        <div class="cc-secsub">Estado detallado de un equipo. Puedes refrescar las fechas <b>en vivo desde
+            Metabase</b>. Las acciones de bloqueo y registro quedan en un log local hasta conectar el backend.</div>
+        <div style="max-width:340px;margin-bottom:16px">
+          <div class="cc-fld" style="margin-bottom:0">
+            <label>Buscar equipo por serial</label>
+            <input type="text" id="cc-gq" placeholder="Escribe un serial y Enter" list="cc-gqlist"
+              onkeydown="if(event.key==='Enter')ccSerialSearch()">
+            <datalist id="cc-gqlist"></datalist>
+          </div>
+        </div>
+        <div id="cc-gest"></div>
+      </section>
+
+      <!-- ============================== ALERTAS ========================= -->
+      <section id="sec-alertas" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Alertas y reportes</div>
+        <div class="cc-secsub">Alertas preventivas de vencimiento y reporte de desasignación. Aquí se calcula <b>a
+            quién se avisaría hoy</b>; el envío automático diario es el gancho de Capa B. <span class="cc-conn">envío
+            automático · Apps Script</span></div>
+
+        <div class="cc-card" style="margin-bottom:1.5rem">
+          <div class="ct"><span class="d" style="background:var(--accent)"></span>Configuración</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+            <div>
+              <div class="cc-fld"><label>Ventanas de aviso preventivo (días, separadas por coma)</label>
+                <input type="text" id="cc-win" value="30,15,7" oninput="ccSaveCfg();ccAlertas()"></div>
+              <div class="cc-fld"><label>Ventana de desasignación (días)</label>
+                <input type="number" id="cc-deswin" value="30" min="1" oninput="ccSaveCfg();ccAlertas()"></div>
+              <label style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="cc-toBia" checked onchange="ccSaveCfg();ccAlertas()"> Avisar a Bia</label>
+              <label
+                style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px">
+                <input type="checkbox" id="cc-toContr" checked onchange="ccSaveCfg();ccAlertas()"> Avisar a
+                contratistas</label>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--t2);font-weight:600">Correo de contratistas <span
+                  style="color:var(--t3)">(para el aviso)</span></label>
+              <div id="cc-emails"
+                style="margin-top:8px;max-height:180px;overflow:auto;display:flex;flex-direction:column;gap:6px"></div>
+            </div>
+          </div>
+          <div class="cc-help" style="margin-top:10px">Se guarda en este dispositivo. Con Capa B pasa a una pestaña del
+            Sheet para todo el equipo. <span class="cc-conn">persistencia · Google Sheet</span></div>
+        </div>
+
+        <div class="cc-card" style="margin-bottom:1.5rem">
+          <div class="ct"><span class="d" style="background:var(--warn)"></span>Alertas preventivas que se enviarían hoy
+          </div>
+          <div class="cc-grid k4" id="cc-alkpi" style="margin-bottom:1rem"></div>
+          <div id="cc-allist"></div>
+        </div>
+
+        <div class="cc-card">
+          <div class="ct"><span class="d" style="background:var(--purple)"></span>Desasignación por vencimiento ·
+            reporte de impacto</div>
+          <div class="cc-secsub" style="margin-bottom:1rem">Equipos <b>ASIGNADO</b> con certificado vencido o por vencer
+            en la ventana: candidatos a desasignación.</div>
+          <div class="cc-grid k3" id="cc-deskpi" style="margin-bottom:1.25rem"></div>
+          <div class="cc-grid k2">
+            <div>
+              <div class="ct"><span class="d" style="background:var(--purple)"></span>Impacto por contratista / sede
+              </div>
+              <div class="cc-bars" id="cc-desbars"></div>
+            </div>
+            <div>
+              <div class="ct"><span class="d" style="background:var(--danger)"></span>Equipos en riesgo</div>
+              <div id="cc-deslist" style="max-height:340px;overflow:auto"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ LABORATORIO ========================= -->
+      <section id="sec-lab" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Seguimiento de laboratorio · SLA</div>
+        <div class="cc-secsub">Equipos en laboratorios externos (METROBIT / INPEL). Carga el archivo de <b>envíos a
+            calibrar</b> (Excel/CSV) para activar el cálculo de días en laboratorio e incumplimiento de SLA.</div>
+
+        <div class="cc-card" style="margin-bottom:1.25rem">
+          <div class="ct"><span class="d" style="background:var(--accent)"></span>Envíos a laboratorio + SLA</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+            <label class="cc-btn go" style="cursor:pointer">⬆ Cargar Excel / CSV
+              <input type="file" accept=".csv,.xlsx,.xls" style="display:none" onchange="ccUploadEnvios(this)"></label>
+            <button class="cc-btn" onclick="ccTemplate()">Descargar plantilla CSV</button>
+            <button class="cc-btn" onclick="ccDemoEnvios()">Cargar ejemplo</button>
+            <button class="cc-btn danger" onclick="ccClearEnvios()">Borrar envíos</button>
+            <span id="cc-envstat" class="cc-conn">sin envíos cargados</span>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap">
+            <div class="cc-fld" style="margin-bottom:0"><label>SLA METROBIT (días)</label><input type="number"
+                id="cc-slaMB" value="15" min="1" style="width:120px" oninput="ccSaveCfg();ccLab()"></div>
+            <div class="cc-fld" style="margin-bottom:0"><label>SLA INPEL (días)</label><input type="number"
+                id="cc-slaIN" value="20" min="1" style="width:120px" oninput="ccSaveCfg();ccLab()"></div>
+          </div>
+          <div class="cc-help" style="margin-top:8px">Columnas del archivo: <b>serial</b>, <b>proveedor</b>
+            (METROBIT/INPEL) y <b>fecha</b> de envío (acepta 29/05/2026, 2026-05-29 o “mayo 29, 2026”). PDF: carga
+            manual por ahora — no se parsea en el navegador.</div>
+        </div>
+
+        <div class="cc-grid k3" id="cc-labkpi"></div>
+        <div class="cc-lab" id="cc-lablist"></div>
+      </section>
+
+      <!-- ============================== ANÁLISIS ========================= -->
+      <section id="sec-analisis" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Análisis del inventario gestionable</div>
+        <div class="cc-secsub">Distribuciones reales sobre la población gestionable con certificación.</div>
+        <div class="cc-grid k2">
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--info)"></span>Por ubicación (top 10)</div>
+            <div class="cc-bars" id="cc-an1"></div>
+          </div>
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--purple)"></span>Por marca (top 10)</div>
+            <div class="cc-bars" id="cc-an3"></div>
+          </div>
+        </div>
+        <div class="cc-grid k2">
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--accent)"></span>Por estado</div>
+            <div class="cc-bars" id="cc-an2"></div>
+          </div>
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--warn)"></span>¿Qué certificación vence primero?</div>
+            <div class="cc-bars" id="cc-an4"></div>
+            <div class="cc-help">De cada equipo, cuál de los dos certificados (Calibración / Conformidad) está más
+              próximo a vencer.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ AUDITORÍA ========================== -->
+      <section id="sec-auditoria" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Trazabilidad y dashboards de auditoría</div>
+        <div class="cc-secsub">El log de abajo registra las acciones de <b>esta sesión</b> (demostración local). El
+          historial persistente y las métricas de efectividad requieren las tablas <code
+            style="font-family:var(--mono)">cc_*</code> en Supabase + workflows n8n.</div>
+        <div class="cc-grid k2">
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--purple)"></span>Log de actividad (sesión local)
+            </div>
+            <div class="cc-tl" id="cc-log"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="cc-grid k2" style="margin-bottom:0" id="cc-dash"></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <div class="tdot"></div><span id="tmsg"></span>
+  </div>
+
+  <script>
+    /* ===================================================================== */
+    /* ===== CertControl · módulo de Vencidos · datos reales de Metabase === */
+    /* ===================================================================== */
+
+    /* Muestra real embebida (subconjunto de mb-data.json) — fallback offline */
+    const CC_SAMPLE = [{"serial":"2023/56969","sku":"TC 20/5 Exterior C 0.5s B 2,5 VA  T 17,5 kV","estado":"PENDIENTE CERTIFICADOS","marca":"ESITAS","ubicacion":"METROBIT BOGOTA","bia_code":"","venc_conf":"mayo 14, 2027","venc_calib":"febrero 11, 2026"},{"serial":"62120944","sku":"TC 100/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"PENDIENTE CERTIFICADOS","marca":"BLOX","ubicacion":"INPEL","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"marzo 4, 2026"},{"serial":"62111971","sku":"TC 400/5 Barra Pasante C 0.5s B 2,5 VA  T 0,72 kV","estado":"PENDIENTE CERTIFICADOS","marca":"BLOX","ubicacion":"METROBIT BOGOTA","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"noviembre 19, 2025"},{"serial":"2108297-3","sku":"TC 400/5 Barra Pasante C 0.5s B 2,5 VA  T 0,72 kV","estado":"PENDIENTE CERTIFICADOS","marca":"BLOX","ubicacion":"METROBIT BOGOTA","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"noviembre 19, 2025"},{"serial":"25046006","sku":"D2000Cor5(100) AT","estado":"ASIGNADO","marca":"INHEMETER","ubicacion":"SGE Bucaramanga","bia_code":"CO0800005298","venc_conf":"febrero 17, 2028","venc_calib":"mayo 19, 2026"},{"serial":"25046213","sku":"TP 13200√3/120√3 V 10 VA Exterior 17,5 kV","estado":"PENDIENTE CERTIFICADOS","marca":"BLOX","ubicacion":"REHOBOT","bia_code":"","venc_conf":"enero 8, 2028","venc_calib":"febrero 16, 2026"},{"serial":"241558009","sku":"TC 7,5-15/5 Exterior C 0.5s B 5VA","estado":"DISPONIBLE","marca":"ZILMER","ubicacion":"Bia Barranquilla","bia_code":"","venc_conf":"enero 23, 2028","venc_calib":"mayo 23, 2026"},{"serial":"241559005","sku":"TC 15/5 Exterior C 0.5s B 5 VA  T 17,5 kV","estado":"PENDIENTE CERTIFICADOS","marca":"ZILMER INELTEC","ubicacion":"REHOBOT","bia_code":"","venc_conf":"enero 23, 2028","venc_calib":"marzo 18, 2026"},{"serial":"241558010","sku":"TC 7,5-15/5 Exterior C 0.5s B 5VA","estado":"DISPONIBLE","marca":"ZILMER","ubicacion":"Bia Barranquilla","bia_code":"","venc_conf":"enero 23, 2028","venc_calib":"mayo 23, 2026"},{"serial":"241558011","sku":"TC 7,5-15/5 Exterior C 0.5s B 5VA","estado":"ASIGNADO","marca":"ZILMER","ubicacion":"Bia Bogota","bia_code":"CO0700006040","venc_conf":"enero 23, 2028","venc_calib":"mayo 23, 2026"},{"serial":"25046219","sku":"TP 13200√3/120√3 V 10 VA Exterior 17,5 kV","estado":"PENDIENTE CERTIFICADOS","marca":"BLOX","ubicacion":"REHOBOT","bia_code":"","venc_conf":"enero 8, 2028","venc_calib":"marzo 2, 2026"},{"serial":"2024-1004819096","sku":"TP 34500√3/120√3 V 5 VA Interior 36 kV","estado":"PENDIENTE CERTIFICADOS","marca":"ALCE","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"octubre 19, 2025","venc_calib":"septiembre 9, 2025"},{"serial":"923.463","sku":"TP 13200√3/120√3 V 10 VA Exterior 17,5 kV","estado":"ASIGNADO","marca":"BRAFORMER","ubicacion":"Bia Bogota","bia_code":"CO0700006040","venc_conf":"diciembre 10, 2028","venc_calib":"mayo 26, 2026"},{"serial":"1512642-2","sku":"TC 150/5 Ventana Exterior C 0.5s B 2,5 VA  T 0,72 kV","estado":"PENDIENTE CERTIFICADOS","marca":"","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"marzo 4, 2026"},{"serial":"250020012","sku":"TC 50-100/5 Interior C 0.5s B 2,5 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"enero 23, 2028","venc_calib":"mayo 29, 2026"},{"serial":"241558012","sku":"TC 7,5-15/5 Exterior C 0.5s B 5VA","estado":"ASIGNADO","marca":"ZILMER","ubicacion":"Bia Bogota","bia_code":"CO0700006040","venc_conf":"enero 23, 2028","venc_calib":"mayo 23, 2026"},{"serial":"771690","sku":"TC 10-20/5 Interior C 0.5s B 2,5 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"diciembre 10, 2028","venc_calib":"mayo 30, 2026"},{"serial":"80001185","sku":"TC 100/5 Ventana Exterior Con cable C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"junio 4, 2026"},{"serial":"2403110007","sku":"TC 100/5 Ventana Exterior Con cable C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"abril 7, 2028","venc_calib":"junio 4, 2026"},{"serial":"932.473","sku":"TC 7,5-15/5 Exterior C 0.5s B 5VA","estado":"DISPONIBLE","marca":"BRASFORMER","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"diciembre 10, 2028","venc_calib":"mayo 30, 2026"},{"serial":"63111833","sku":"TC 1000/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"junio 1, 2026"},{"serial":"63111839","sku":"TC 1000/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"junio 1, 2026"},{"serial":"2403110004","sku":"TC 100/5 Ventana Exterior Con cable C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"TAC","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"abril 7, 2028","venc_calib":"junio 4, 2026"},{"serial":"18027936-6","sku":"TC 5-10/5 Interior C 0.5s B 5 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"ARTECHE","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"abril 17, 2027","venc_calib":"mayo 30, 2026"},{"serial":"80001178","sku":"TC 100/5 Ventana Exterior Con cable C 0.5s B 2,5 VA  T 0,72 kV","estado":"ASIGNADO","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"CO0200004096","venc_conf":"septiembre 19, 2027","venc_calib":"junio 4, 2026"},{"serial":"1511934-1","sku":"TC 150/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"ASIGNADO","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"CO0400006537","venc_conf":"septiembre 19, 2027","venc_calib":"junio 4, 2026"},{"serial":"2023/57007","sku":"TC 20/5 Exterior C 0.5s B 2,5 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"ESITAS","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"mayo 14, 2027","venc_calib":"junio 12, 2026"},{"serial":"2022/23043","sku":"TC 6/5 Exterior C 0.5s B 5 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"ESITAS","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"mayo 14, 2027","venc_calib":"junio 12, 2026"},{"serial":"2022/23108","sku":"TC 6/5 Exterior C 0.5s B 2,5 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"ESITAS","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"mayo 14, 2027","venc_calib":"junio 12, 2026"},{"serial":"0101259014211","sku":"C2000Cor5 (100) AT","estado":"DISPONIBLE","marca":"MICROSTAR","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 4, 2028","venc_calib":"junio 7, 2026"},{"serial":"2110622-1","sku":"TC 400/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"junio 12, 2026"},{"serial":"1512620-1","sku":"TC 150/5 Ventana Interior C 0.5s B 5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"junio 12, 2026"},{"serial":"1512619-1","sku":"TC 150/5 Ventana Interior C 0.5s B 5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"junio 12, 2026"},{"serial":"0101259014229","sku":"C2000Cor5 (100) AT","estado":"DISPONIBLE","marca":"MICROSTAR","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 4, 2028","venc_calib":"junio 7, 2026"},{"serial":"0101259014237","sku":"C2000Cor5 (100) AT","estado":"DISPONIBLE","marca":"MICROSTAR","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 4, 2028","venc_calib":"junio 7, 2026"},{"serial":"0101259014245","sku":"C2000Cor5 (100) AT","estado":"DISPONIBLE","marca":"MICROSTAR","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 4, 2028","venc_calib":"junio 7, 2026"},{"serial":"932.472","sku":"TC 7,5-15/5 Exterior C 0.5s B 5VA","estado":"DISPONIBLE","marca":"BRASFORMER","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"diciembre 10, 2028","venc_calib":"junio 29, 2026"},{"serial":"241558013","sku":"TC 7,5-15/5 Exterior C 0.5s B 5VA","estado":"ASIGNADO","marca":"ZILMER","ubicacion":"Bia Bogota","bia_code":"CO0700006040","venc_conf":"enero 23, 2028","venc_calib":"junio 22, 2026"},{"serial":"1627816-2","sku":"TC 200/5 Ventana Exterior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"junio 22, 2026"},{"serial":"1627824-2","sku":"TC 200/5 Ventana Exterior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"junio 22, 2026"},{"serial":"24057772","sku":"TC 5/5 Exterior C 0.5s B 10 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"enero 8, 2028","venc_calib":"junio 27, 2026"},{"serial":"2103310035","sku":"TC 200/5 Ventana Exterior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"abril 7, 2028","venc_calib":"junio 22, 2026"},{"serial":"2403310922","sku":"TC 200/5 Ventana Exterior Con cable C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"abril 7, 2028","venc_calib":"junio 22, 2026"},{"serial":"2403310916","sku":"TC 200/5 Ventana Exterior Con cable C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"abril 7, 2028","venc_calib":"junio 22, 2026"},{"serial":"23101145","sku":"P2000DCor5 (100) AT","estado":"ASIGNADO","marca":"Microstar","ubicacion":"Bia Barranquilla","bia_code":"CO0500006309","venc_conf":"septiembre 4, 2028","venc_calib":"octubre 18, 2026"},{"serial":"24031250","sku":"TC 5-10/5 Exterior C 0.5s B 2,5 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Barranquilla","bia_code":"","venc_conf":"enero 8, 2028","venc_calib":"septiembre 19, 2026"},{"serial":"859.267","sku":"TP 13200√3/120√3 V 5 VA Exterior 17,5 kV","estado":"DISPONIBLE","marca":"BRASFORMER","ubicacion":"Bia Barranquilla","bia_code":"","venc_conf":"diciembre 10, 2028","venc_calib":"septiembre 16, 2026"},{"serial":"24031251","sku":"TC 5-10/5 Exterior C 0.5s B 2,5 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Barranquilla","bia_code":"","venc_conf":"enero 8, 2028","venc_calib":"septiembre 19, 2026"},{"serial":"1512207-2","sku":"TC 150/5 Ventana Exterior C 0.5s B 2,5 VA  T 0,72 kV","estado":"PENDIENTE CERTIFICADOS","marca":"","ubicacion":"JEM","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"enero 28, 2026"},{"serial":"24037054","sku":"TP 13200√3/120√3 V 5 VA Exterior 17,5 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Barranquilla","bia_code":"","venc_conf":"enero 8, 2028","venc_calib":"septiembre 16, 2026"},{"serial":"2400210031","sku":"TC 150/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"TAC","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"abril 7, 2028","venc_calib":"septiembre 7, 2026"},{"serial":"037295672531","sku":"INHEMETER i310 Directa C.1 3x120/208V","estado":"DISPONIBLE","marca":"INHEMETER","ubicacion":"REHOBOT","bia_code":"","venc_conf":"febrero 17, 2028","venc_calib":"julio 1, 2026"},{"serial":"96010142","sku":"TC 100/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"PENDIENTE CERTIFICADOS","marca":"BLOX","ubicacion":"JEM","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"diciembre 18, 2025"},{"serial":"1627467-1","sku":"TC 200/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Barranquilla","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"septiembre 22, 2026"},{"serial":"1627343-1","sku":"TC 200/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"METROBIT BOGOTA","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"septiembre 22, 2026"},{"serial":"221000078","sku":"TC 400/5 Ventana Exterior Con cable C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"BLOX","ubicacion":"Bia Bogota","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"septiembre 23, 2026"},{"serial":"37295530416","sku":"INHEMETER iT30 Semidirecta / Indirecta C0,5S 3×277/480V","estado":"AVERIADO","marca":"INHEMETER","ubicacion":"INPEL","bia_code":"","venc_conf":"febrero 17, 2028","venc_calib":"mayo 6, 2026"},{"serial":"859.270","sku":"TP 13200√3/120√3 V 5 VA Exterior 17,5 kV","estado":"AVERIADO","marca":"BRASFORMER","ubicacion":"INPEL","bia_code":"","venc_conf":"noviembre 29, 2025","venc_calib":"septiembre 9, 2025"},{"serial":"1904110060","sku":"TC 800/5 Ventana Exterior C 0.5s B 2,5 VA  T 0,72 kV","estado":"DISPONIBLE","marca":"","ubicacion":"METROBIT BOGOTA","bia_code":"","venc_conf":"abril 7, 2028","venc_calib":"septiembre 9, 2026"},{"serial":"37243187566","sku":"INHEMETER i310 Directa C.1 3x120/208V","estado":"PENDIENTE CERTIFICADOS","marca":"INHEMETER","ubicacion":"INPEL","bia_code":"","venc_conf":"febrero 17, 2028","venc_calib":"abril 5, 2026"},{"serial":"25066253","sku":"TP 13200√3/120√3 V 15 VA Exterior 17,5 kV","estado":"PENDIENTE CERTIFICADOS","marca":"BLOX","ubicacion":"INPEL","bia_code":"","venc_conf":"enero 8, 2028","venc_calib":"marzo 28, 2026"},{"serial":"2022-1004180530","sku":"TP 34500√3/120√3 V 10 VA Exterior 36 kV","estado":"ASIGNADO","marca":"ALCE","ubicacion":"INPEL","bia_code":"CO0200006604","venc_conf":"octubre 19, 2028","venc_calib":"abril 30, 2026"},{"serial":"1915611-1","sku":"TC 300/5 Ventana Interior C 0.5s B 2,5 VA  T 0,72 kV","estado":"PENDIENTE CERTIFICADOS","marca":"BLOX","ubicacion":"METROBIT BOGOTA","bia_code":"","venc_conf":"septiembre 19, 2027","venc_calib":"febrero 10, 2026"},{"serial":"18021705-5","sku":"TC 6/5 Interior C 0.5s B 2,5 VA  T 17,5 kV","estado":"DISPONIBLE","marca":"","ubicacion":"METROBIT BOGOTA","bia_code":"","venc_conf":"abril 17, 2027","venc_calib":"septiembre 7, 2026"}];
+
+    /* ---------- parser de fechas: ISO + texto español (clave para el navegador) ---------- */
+    const MES = { enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5, julio: 6, agosto: 7, septiembre: 8, setiembre: 8, octubre: 9, noviembre: 10, diciembre: 11 };
+    function parseFecha(s) {
+      if (!s) return null;
+      s = String(s).trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) { const d = new Date(s); return isNaN(d) ? null : d; }
+      let m = s.toLowerCase().match(/([a-záéíóú]+)\s+(\d{1,2}),?\s+(\d{4})/);          // "mayo 14, 2027"
+      if (m && MES[m[1]] !== undefined) return new Date(+m[3], MES[m[1]], +m[2]);
+      m = s.toLowerCase().match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/);       // "14 de mayo de 2027"
+      if (m && MES[m[2]] !== undefined) return new Date(+m[3], MES[m[2]], +m[1]);
+      m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);                            // "29/05/2026" (dd/mm/yyyy)
+      if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+      const d = new Date(s); return isNaN(d) ? null : d;
+    }
+    const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
+    function diasA(s) { const d = parseFecha(s); if (!d) return null; d.setHours(0, 0, 0, 0); return Math.round((d - TODAY) / 86400000); }
+    function fFecha(s) { const d = parseFecha(s); if (!d) return s || '—'; return d.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' }); }
+
+    /* ---------- normalización al esquema real ---------- */
+    const ACC = /ANTENA|BLOQUE|ROUTER|MODEM/i;
+    const GEST = ['DISPONIBLE', 'ASIGNADO', 'PENDIENTE CERTIFICADOS'];
+    function norm(e) {
+      const dCal = diasA(e.venc_calib), dConf = diasA(e.venc_conf);
+      const cand = [];
+      if (dCal !== null) cand.push({ d: dCal, tipo: 'Calibración', date: e.venc_calib });
+      if (dConf !== null) cand.push({ d: dConf, tipo: 'Conformidad', date: e.venc_conf });
+      cand.sort((a, b) => a.d - b.d);
+      return {
+        serial: e.serial || '—', sku: e.sku || '—', estado: (e.estado || '').toUpperCase(),
+        marca: e.marca || '', ubic: e.ubicacion || '—', bia: e.bia_code || '',
+        cal: e.venc_calib, conf: e.venc_conf, dCal, dConf,
+        _n: cand[0] || null, _d: cand.length ? cand[0].d : null, _acc: ACC.test(e.sku || '')
+      };
+    }
+
+    let ALL = [], LIVE = false, SESSIONLOG = [];
+
+    /* ---------- presentación ---------- */
+    const rKey = d => d == null ? '' : d < 0 ? 'exp' : d <= 20 ? '0-20' : d <= 30 ? '21-30' : '30+';
+    function rBadge(d) {
+      if (d == null) return `<span class="cc-r" style="background:var(--s3);color:var(--t3)">sin fecha</span>`;
+      if (d < 0) return `<span class="cc-r r-exp">Vencido</span>`;
+      if (d <= 7) return `<span class="cc-r r-crit">${d} d</span>`;
+      if (d <= 20) return `<span class="cc-r r-20">${d} d</span>`;
+      if (d <= 30) return `<span class="cc-r r-30">${d} d</span>`;
+      return `<span class="cc-r r-ok">${d} d</span>`;
+    }
+    const dColor = d => d == null ? 'var(--t3)' : d <= 7 ? '#fca5a5' : d <= 20 ? 'var(--warn)' : d <= 30 ? 'var(--info)' : 'var(--accent)';
+    const estChip = est => {
+      const c = est === 'DISPONIBLE' ? 'ch-ok' : est === 'PENDIENTE CERTIFICADOS' ? 'ch-alert' : est === 'ASIGNADO' ? 'ch-cal' : est === 'INSTALADO' ? 'ch-ot' : 'ch-block';
+      const lbl = est === 'PENDIENTE CERTIFICADOS' ? 'PEND. CERT.' : est;
+      return `<span class="cc-chip ${c}"><span class="dt"></span>${lbl}</span>`;
+    };
+    function ring(pct) {
+      const r = 26, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
+      return `<svg width="64" height="64" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--s3)" stroke-width="7"/>
+        <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
+          stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 32 32)"/></svg>`;
+    }
+    const barsHTML = (arr, color, fmt) => { const mx = Math.max(...arr.map(a => a[1]), 1); return arr.map(([n, v]) => `<div class="cc-barrow"><span class="nm" title="${n}">${n}</span><div class="cc-track"><div class="cc-fill" style="width:${v / mx * 100}%;background:${color}"></div></div><span class="vv">${fmt ? fmt(v) : v}</span></div>`).join('') || '<div class="cc-help">Sin datos</div>'; };
+
+    /* población gestionable (igual que "Equipos Vencidos") */
+    const gestionables = () => ALL.filter(e => GEST.includes(e.estado) && !e._acc && e._d !== null);
+
+    /* ===================== RESUMEN ===================== */
+    function ccResumen() {
+      const g = gestionables();
+      const venc = g.filter(e => e._d < 0).length;
+      const c7 = g.filter(e => e._d >= 0 && e._d <= 7).length;
+      const c830 = g.filter(e => e._d > 7 && e._d <= 30).length;
+      const vig = g.filter(e => e._d > 30).length;
+      const pct = g.length ? Math.round(vig / g.length * 100) : 0;
+      const kpis = [
+        ['Gestionables', g.length.toLocaleString(), 'var(--info)', 'con certificación'],
+        ['Vencidos', venc.toLocaleString(), '#fca5a5', 'requieren acción'],
+        ['Críticos ≤7 días', c7.toLocaleString(), 'var(--danger)', 'gestión inmediata'],
+        ['Por vencer 8–30', c830.toLocaleString(), 'var(--warn)', 'ventana de alerta'],
+        ['Vigentes 30+', vig.toLocaleString(), 'var(--accent)', 'al día'],
+        ['% al día', pct + '%', 'var(--accent)', 'vigentes / total']
+      ];
+      document.getElementById('cc-kpis').innerHTML = kpis.map(([l, v, c, m]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div><div class="meta">${m}</div></div>`).join('');
+      document.getElementById('cc-heroring').innerHTML = ring(pct) + `<div><div class="big">${pct}%</div><div class="rl">Equipos al día (30+ días)</div></div>`;
+
+      const cExp = venc, c020 = g.filter(e => e._d >= 0 && e._d <= 20).length, c2130 = g.filter(e => e._d > 20 && e._d <= 30).length, c30 = vig;
+      const segs = [['Vencido', cExp, '#f87171'], ['0–20', c020, '#fbbf24'], ['21–30', c2130, '#60a5fa'], ['30+', c30, '#4ade80']];
+      document.getElementById('cc-sem').innerHTML = segs.map(([l, n, c]) => n ? `<div class="seg" style="flex:${n};background:${c}" title="${l}: ${n}">${n}</div>` : '').join('');
+      document.getElementById('cc-semleg').innerHTML = segs.map(([l, n, c]) => `<span><i style="background:${c}"></i>${l} · ${n}</span>`).join('');
+
+      const urg = [...g].filter(e => e._d <= 30).sort((a, b) => a._d - b._d).slice(0, 7);
+      document.getElementById('cc-urg').innerHTML = urg.map(e => `<div class="cc-urgrow" onclick="ccSelect('${(e.serial + '').replace(/'/g, "\\'")}',true)">
+        <span class="sr">${e.serial}</span><span class="tp">${e.sku}</span><span class="dd" style="color:${dColor(e._d)}">${e._d < 0 ? 'venc.' : e._d + ' d'}</span></div>`).join('') || '<div class="cc-help">Sin equipos próximos a vencer 🎉</div>';
+
+      const byU = {}; g.forEach(e => byU[e.ubic] = (byU[e.ubic] || 0) + 1);
+      const arr = Object.entries(byU).sort((a, b) => b[1] - a[1]).slice(0, 8);
+      document.getElementById('cc-bars').innerHTML = barsHTML(arr, 'var(--info)');
+
+      document.getElementById('cc-cov').innerHTML = `<div style="display:flex;gap:24px;margin-bottom:14px">
+        <div class="cc-money"><div class="big" style="color:var(--accent)">${pct}%</div><div class="lbl">al día</div></div>
+        <div class="cc-money"><div class="big" style="color:#fca5a5">${venc}</div><div class="lbl">vencidos hoy</div></div>
+        <div class="cc-money"><div class="big" style="color:var(--info)">${g.length.toLocaleString()}</div><div class="lbl">evaluados</div></div>
+      </div>
+      <div>Población gestionable = <b style="color:var(--t1)">Disponible · Asignado · Pendiente certificados</b>, sin accesorios. El bloqueo automático y las alertas escalonadas (30/15/7 días) son el siguiente paso. <span class="cc-conn">pendiente · n8n + Supabase cc_*</span></div>`;
+    }
+
+    /* ===================== EQUIPOS ===================== */
+    function ccFillSelects() {
+      const byU = {}; ALL.forEach(e => byU[e.ubic] = (byU[e.ubic] || 0) + 1);
+      const top = Object.entries(byU).filter(([k]) => k && k !== 'INSTALADO').sort((a, b) => b[1] - a[1]).slice(0, 30);
+      const sel = document.getElementById('cc-fub');
+      top.forEach(([u, n]) => { const o = document.createElement('option'); o.value = u; o.textContent = `${u} (${n})`; sel.appendChild(o); });
+      const dl = document.getElementById('cc-gqlist');
+      dl.innerHTML = gestionables().sort((a, b) => a._d - b._d).slice(0, 400).map(e => `<option value="${e.serial}">`).join('');
+    }
+    function ccGetFiltered() {
+      const q = document.getElementById('cc-q').value.toLowerCase().trim();
+      const fe = document.getElementById('cc-festado').value;
+      const fu = document.getElementById('cc-fub').value;
+      const fr = document.getElementById('cc-frango').value;
+      return ALL.filter(e => {
+        if (e._acc) return false;
+        if (fe === '__GEST__') { if (!GEST.includes(e.estado)) return false; }
+        else if (fe) { if (e.estado !== fe) return false; }
+        if (fu && e.ubic !== fu) return false;
+        if (fr && rKey(e._d) !== fr) return false;
+        if (q && !(`${e.serial} ${e.sku} ${e.marca} ${e.ubic}`.toLowerCase().includes(q))) return false;
+        return true;
+      }).sort((a, b) => (a._d == null ? 1e9 : a._d) - (b._d == null ? 1e9 : b._d));
+    }
+    function ccRenderTabla() {
+      const rows = ccGetFiltered();
+      const CAP = 300, show = rows.slice(0, CAP);
+      document.getElementById('cc-cnt').textContent = rows.length > CAP ? `mostrando ${CAP} de ${rows.length.toLocaleString()} (refina los filtros)` : `${rows.length.toLocaleString()} equipo${rows.length !== 1 ? 's' : ''}`;
+      if (!rows.length) { document.getElementById('cc-tabla').innerHTML = '<div class="empty"><h3>Sin resultados</h3><p>Ajusta los filtros</p></div>'; return; }
+      document.getElementById('cc-tabla').innerHTML = `<table><thead><tr>
+        <th>Serial</th><th>SKU</th><th>Estado</th><th>Ubicación</th><th>Próx. venc.</th><th>Días</th><th>Rango</th>
+      </tr></thead><tbody>${show.map(e => `<tr style="cursor:pointer" onclick="ccSelect('${(e.serial + '').replace(/'/g, "\\'")}',true)">
+        <td class="mc">${e.serial}</td><td class="nc" title="${e.sku}">${e.sku}</td>
+        <td>${estChip(e.estado)}</td>
+        <td class="uc"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M8 1a5 5 0 015 5c0 3.5-5 9-5 9S3 9.5 3 6a5 5 0 015-5z" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6" r="1.5" stroke="currentColor" stroke-width="1.5"/></svg>${e.ubic}</td>
+        <td style="font-family:var(--mono);font-size:11px">${e._n ? fFecha(e._n.date) + ` <span style="color:var(--t3)">(${e._n.tipo.slice(0, 4)}.)</span>` : '—'}</td>
+        <td style="font-family:var(--mono);font-weight:700;color:${dColor(e._d)}">${e._d == null ? '—' : (e._d < 0 ? e._d : '+' + e._d)}</td>
+        <td>${rBadge(e._d)}</td>
+      </tr>`).join('')}</tbody></table>`;
+    }
+    function ccClear() { document.getElementById('cc-q').value = ''; document.getElementById('cc-festado').value = '__GEST__'; document.getElementById('cc-fub').value = ''; document.getElementById('cc-frango').value = ''; ccRenderTabla(); }
+
+    /* ===================== GESTIÓN ===================== */
+    let ccSel = null;
+    const cur = () => ALL.find(e => e.serial === ccSel);
+    function ccSerialSearch() {
+      const q = document.getElementById('cc-gq').value.trim();
+      const e = ALL.find(x => (x.serial + '') === q) || ALL.find(x => (x.serial + '').toLowerCase().includes(q.toLowerCase()));
+      if (!e) { toast('No se encontró ese serial', 'e'); return; }
+      ccSel = e.serial; ccRenderGestion();
+    }
+    function ccRenderGestion() {
+      const e = cur();
+      if (!e) { document.getElementById('cc-gest').innerHTML = '<div class="empty"><h3>Selecciona un equipo</h3><p>Busca un serial arriba o haz clic en una fila de Equipos</p></div>'; return; }
+      const certRow = (lbl, date, d) => `<div class="cc-kv"><span class="k">${lbl}</span>
+        <span class="v">${fFecha(date)} · <span style="color:${dColor(d)}">${d == null ? 's/f' : (d < 0 ? d + ' d (vencido)' : '+' + d + ' d')}</span> ${rBadge(d)}</span></div>`;
+      const hist = SESSIONLOG.filter(l => l.eq === e.serial);
+      document.getElementById('cc-gest').innerHTML = `<div class="cc-det">
+        <div class="cc-card">
+          <div class="ct"><span class="d" style="background:var(--accent)"></span>Equipo · ${e.serial}</div>
+          <div class="cc-kv"><span class="k">SKU</span><span class="v" style="max-width:60%;text-align:right">${e.sku}</span></div>
+          <div class="cc-kv"><span class="k">Marca</span><span class="v">${e.marca || '—'}</span></div>
+          <div class="cc-kv"><span class="k">Estado</span><span class="v">${estChip(e.estado)}</span></div>
+          <div class="cc-kv"><span class="k">Ubicación</span><span class="v">${e.ubic}</span></div>
+          <div class="cc-kv"><span class="k">Código BIA</span><span class="v" style="color:var(--info)">${e.bia || '—'}</span></div>
+          ${certRow('Venc. Calibración', e.cal, e.dCal)}
+          ${certRow('Venc. Conformidad', e.conf, e.dConf)}
+          <div class="cc-actions">
+            <button class="cc-btn go" onclick="ccLive()">↻ Refrescar en vivo (Metabase)</button>
+            <button class="cc-btn danger" onclick="ccAct('block')">Bloquear preventivamente</button>
+            <button class="cc-btn" onclick="ccAct('unblock')">Desbloquear</button>
+          </div>
+          <div style="margin-top:14px;padding-top:16px;border-top:1px solid var(--b1)">
+            <div class="ct"><span class="d" style="background:var(--info)"></span>Registrar nueva certificación</div>
+            <div class="cc-fld"><label>Tipo</label><select id="cc-ctipo"><option>Calibración</option><option>Conformidad</option></select></div>
+            <div class="cc-fld"><label>Nueva fecha de vencimiento</label><input type="date" id="cc-cfecha"></div>
+            <button class="cc-btn go" onclick="ccRegCert()">Registrar</button>
+            <div class="cc-help">Solo se acepta fecha futura. Se persistirá al conectar Supabase <code style="font-family:var(--mono)">cc_certificaciones</code>.</div>
+          </div>
+        </div>
+        <div class="cc-card">
+          <div class="ct"><span class="d" style="background:var(--purple)"></span>Historial (sesión)</div>
+          ${hist.length ? `<div class="cc-tl">${hist.map(l => `<div class="cc-tlrow"><span class="dot" style="background:${l.color}"></span><div class="hd"><span class="ac">${l.ac}</span><span class="tm">${l.t}</span></div><div class="ds">${l.ds}</div></div>`).join('')}</div>` : '<div class="cc-help">Sin movimientos en esta sesión. El historial persistente vive en Supabase <code style="font-family:var(--mono)">cc_bloqueos</code> (pendiente).</div>'}
+        </div>
+      </div>`;
+      document.getElementById('cc-gq').value = e.serial;
+    }
+    function ccSelect(sr, jump) { ccSel = sr; ccRenderGestion(); if (jump) ccSec('gestion'); }
+
+    function pushLog(eq, ac, ds, color) { SESSIONLOG.unshift({ eq, ac, ds, color, t: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) }); }
+    function ccAct(kind) {
+      const e = cur(); if (!e) return;
+      if (kind === 'block') { pushLog(e.serial, 'Bloqueo preventivo', 'Simulado · pendiente Voltio WMS + Supabase', 'var(--danger)'); toast('🔌 Bloqueo simulado · conectar a Voltio WMS / Supabase', 's'); }
+      else { pushLog(e.serial, 'Desbloqueo', 'Simulado · pendiente Voltio WMS + Supabase', 'var(--accent)'); toast('🔌 Desbloqueo simulado · conectar a Voltio WMS / Supabase', 's'); }
+      ccRenderGestion(); ccAudit();
+    }
+    function ccRegCert() {
+      const e = cur(); if (!e) return;
+      const tipo = document.getElementById('cc-ctipo').value, fecha = document.getElementById('cc-cfecha').value;
+      if (!fecha) { toast('Selecciona una fecha de vencimiento', 'e'); return; }
+      if (diasA(fecha) <= 0) { toast('La nueva certificación debe tener fecha futura', 'e'); return; }
+      pushLog(e.serial, 'Certificación registrada', `${tipo} hasta ${fFecha(fecha)} · simulado`, 'var(--info)');
+      toast('🔌 Certificación registrada (simulado) · conectar Supabase', 's'); ccRenderGestion(); ccAudit();
+    }
+    async function ccLive() {
+      const e = cur(); if (!e) return;
+      const key = localStorage.getItem('bia_mb_key') || '';
+      if (!key) { toast('No hay API key. Configúrala en Inventario → Admin (se guarda en este dispositivo).', 'e'); return; }
+      toast('Consultando Metabase…', 's');
+      try {
+        const res = await fetch('/api/metabase', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serial: e.serial, apiKey: key }) });
+        if (!res.ok) { toast('Proxy /api/metabase no disponible (requiere despliegue en Vercel).', 'e'); return; }
+        const rows = await res.json(); const r = Array.isArray(rows) ? rows[0] : rows;
+        if (!r) { toast('Metabase no devolvió datos para ese serial.', 'e'); return; }
+        const merged = norm({
+          serial: e.serial, sku: r.sku || e.sku, estado: r.estado || e.estado, marca: r.marca || e.marca,
+          ubicacion: r.ubicacion || e.ubic, bia_code: r.bia_code || e.bia,
+          venc_calib: r.venc_calib || r.vencimiento_certificado_calibracion || e.cal,
+          venc_conf: r.venc_conf || r.vencimiento_certificado_conformidad || e.conf
+        });
+        const i = ALL.findIndex(x => x.serial === e.serial); if (i >= 0) ALL[i] = merged;
+        pushLog(e.serial, 'Consulta en vivo', 'Fechas actualizadas desde Metabase', 'var(--accent)');
+        ccRenderGestion(); ccResumen(); toast('✓ Datos actualizados en vivo desde Metabase', 's');
+      } catch (err) { toast('No se pudo consultar (CORS/red). Funciona desplegado con el proxy.', 'e'); }
+    }
+
+    /* ===================== LABORATORIO · SLA ===================== */
+    let ENVIOS = {};  // serial -> { prov, fecha }
+    const slaTarget = prov => prov === 'METROBIT' ? (+(document.getElementById('cc-slaMB') || {}).value || 15) : (+(document.getElementById('cc-slaIN') || {}).value || 20);
+    const diasEnLab = fecha => { const d = diasA(fecha); return d == null ? null : -d; };
+    function ccLab() {
+      const labs = ALL.filter(e => /INPEL|METROBIT/i.test(e.ubic) && !e._acc);
+      const nEnv = Object.keys(ENVIOS).length;
+      let breach = 0;
+      labs.forEach(e => { const x = ENVIOS[e.serial]; if (x) { const dd = diasEnLab(x.fecha), prov = /METROBIT/i.test(e.ubic) ? 'METROBIT' : 'INPEL'; if (dd != null && dd - slaTarget(prov) > 0) breach++; } });
+      const mb = labs.filter(e => /METROBIT/i.test(e.ubic)).length, inp = labs.filter(e => /INPEL/i.test(e.ubic)).length;
+      const kpi = [['En METROBIT', mb, 'var(--purple)'], ['En INPEL', inp, 'var(--info)'], ['Exceden SLA', nEnv ? breach : '—', 'var(--danger)']];
+      document.getElementById('cc-labkpi').innerHTML = kpi.map(([l, v, c]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div></div>`).join('');
+      const stat = document.getElementById('cc-envstat'); if (stat) { stat.textContent = nEnv ? `${nEnv} envíos cargados` : 'sin envíos cargados'; }
+      document.getElementById('cc-lablist').innerHTML = labs.sort((a, b) => (a._d == null ? 1e9 : a._d) - (b._d == null ? 1e9 : b._d)).slice(0, 80).map(e => {
+        const prov = /METROBIT/i.test(e.ubic) ? 'METROBIT' : 'INPEL';
+        const col = prov === 'METROBIT' ? 'var(--purple)' : 'var(--info)';
+        const x = ENVIOS[e.serial];
+        let sla;
+        if (x) {
+          const dd = diasEnLab(x.fecha), over = dd - slaTarget(prov);
+          sla = `<div style="font-size:16px;font-weight:800;color:${over > 0 ? 'var(--danger)' : 'var(--accent)'}">${dd} d</div>${over > 0 ? `<span style="color:var(--danger)">SLA +${over} d</span>` : `<span style="color:var(--accent)">dentro de SLA</span>`}`;
+        } else {
+          sla = `<div style="font-size:13px;font-weight:700;color:${dColor(e._d)}">${e._d == null ? '—' : (e._d < 0 ? 'venc.' : '+' + e._d + ' d')}</div><span style="color:var(--t3)">sin envío</span>`;
+        }
+        return `<div class="cc-labrow" style="cursor:pointer" onclick="ccSelect('${(e.serial + '').replace(/'/g, "\\'")}',true)">
+          <div class="prov" style="background:${col}22;color:${col}">${prov.slice(0, 2)}</div>
+          <div class="info"><div class="t">${e.serial} · ${e.sku}</div><div class="s">${prov} · ${e.estado}${x ? ' · enviado ' + fFecha(x.fecha) : ''} · venc. ${e._n ? fFecha(e._n.date) : '—'}</div></div>
+          <div class="sla">${sla}</div>
+        </div>`;
+      }).join('') || '<div class="cc-help">No hay equipos en laboratorios en este conjunto de datos.</div>';
+    }
+
+    /* ===================== ANÁLISIS ===================== */
+    function ccAnalisis() {
+      const g = gestionables();
+      const byU = {}; g.forEach(e => byU[e.ubic] = (byU[e.ubic] || 0) + 1);
+      document.getElementById('cc-an1').innerHTML = barsHTML(Object.entries(byU).sort((a, b) => b[1] - a[1]).slice(0, 10), 'var(--info)');
+      const byM = {}; g.forEach(e => byM[e.marca || '(sin marca)'] = (byM[e.marca || '(sin marca)'] || 0) + 1);
+      document.getElementById('cc-an3').innerHTML = barsHTML(Object.entries(byM).sort((a, b) => b[1] - a[1]).slice(0, 10), 'var(--purple)');
+      const byE = {}; ALL.filter(e => !e._acc).forEach(e => byE[e.estado || '(vacío)'] = (byE[e.estado || '(vacío)'] || 0) + 1);
+      document.getElementById('cc-an2').innerHTML = barsHTML(Object.entries(byE).sort((a, b) => b[1] - a[1]), 'var(--accent)');
+      let cal = 0, conf = 0; g.forEach(e => { if (e._n) (e._n.tipo === 'Calibración' ? cal++ : conf++); });
+      document.getElementById('cc-an4').innerHTML = barsHTML([['Calibración', cal], ['Conformidad', conf]], 'var(--warn)');
+    }
+
+    /* ===================== AUDITORÍA ===================== */
+    function ccAudit() {
+      const log = SESSIONLOG.length ? SESSIONLOG : [{ eq: '—', ac: 'Sin acciones en esta sesión', ds: 'Realiza un bloqueo o registra una certificación en Gestión.', color: 'var(--t3)', t: '' }];
+      document.getElementById('cc-log').innerHTML = `<div class="cc-tl">${log.slice(0, 14).map(l => `<div class="cc-tlrow"><span class="dot" style="background:${l.color}"></span><div class="hd"><span class="ac">${l.ac}${l.eq !== '—' ? ' · <span style="font-family:var(--mono);color:var(--t2)">' + l.eq + '</span>' : ''}</span><span class="tm">${l.t}</span></div><div class="ds">${l.ds}</div></div>`).join('')}</div>`;
+      const g = gestionables();
+      const dashes = [
+        ['Historial de acciones', 'Bloqueos, desbloqueos y certificaciones con responsable y motivo.',
+          [['Bloqueos (sesión)', SESSIONLOG.filter(l => l.ac.includes('Bloqueo')).length], ['Desbloqueos', SESSIONLOG.filter(l => l.ac === 'Desbloqueo').length], ['Certificaciones', SESSIONLOG.filter(l => l.ac.includes('Certificación')).length], ['Persistencia', 'pendiente']]],
+        ['Vista por ubicación', 'Vencimientos por sede/contratista a 90 días.',
+          Object.entries((() => { const o = {}; g.filter(e => e._d <= 90).forEach(e => o[e.ubic] = (o[e.ubic] || 0) + 1); return o; })()).sort((a, b) => b[1] - a[1]).slice(0, 4)]
+        ,
+        ['Mapa de urgencia', 'Equipos por nivel de urgencia (real).',
+          [['Vencidos', g.filter(e => e._d < 0).length], ['Críticos ≤7', g.filter(e => e._d >= 0 && e._d <= 7).length], ['8–30 días', g.filter(e => e._d > 7 && e._d <= 30).length], ['30+ días', g.filter(e => e._d > 30).length]]],
+        ['Métricas de efectividad', 'Bloqueo oportuno y tiempo de renovación.',
+          [['Bloqueo oportuno', 'pendiente'], ['Tiempo renovación', 'pendiente'], ['Requiere', 'historial cc_*']]]
+      ];
+      document.getElementById('cc-dash').innerHTML = dashes.map(([t, d, rows]) => `<div class="cc-dash"><div class="dt">${t}</div><div class="dd">${d}</div>
+        <div class="mini">${(rows.length ? rows : [['Sin datos', '—']]).map(r => `<div class="cc-mini-row"><span>${r[0]}</span><span class="mv">${typeof r[1] === 'number' ? r[1].toLocaleString() : r[1]}</span></div>`).join('')}
+        <div style="margin-top:12px"><span class="cc-conn">abrir en Metabase</span></div></div></div>`).join('');
+    }
+
+    /* ===================== CONFIG (localStorage) ===================== */
+    const CFG = Object.assign({ win: '30,15,7', deswin: 30, toBia: true, toContr: true, slaMB: 15, slaIN: 20, emails: {} }, JSON.parse(localStorage.getItem('cc_cfg') || '{}'));
+    ENVIOS = JSON.parse(localStorage.getItem('cc_envios') || '{}');
+    const seg = u => /^bia/i.test(u) ? 'Bia' : /METROBIT|INPEL/i.test(u) ? 'Lab' : (u === 'INSTALADO' || !u) ? 'Otro' : 'Contratista';
+    const winList = () => CFG.win.split(',').map(x => +x.trim()).filter(x => !isNaN(x)).sort((a, b) => a - b);
+    function ccApplyCfg() {
+      const set = (id, v) => { const el = document.getElementById(id); if (el) { if (el.type === 'checkbox') el.checked = v; else el.value = v; } };
+      set('cc-win', CFG.win); set('cc-deswin', CFG.deswin); set('cc-toBia', CFG.toBia); set('cc-toContr', CFG.toContr); set('cc-slaMB', CFG.slaMB); set('cc-slaIN', CFG.slaIN);
+    }
+    function ccSaveCfg() {
+      const g = id => document.getElementById(id);
+      if (g('cc-win')) CFG.win = g('cc-win').value;
+      if (g('cc-deswin')) CFG.deswin = +g('cc-deswin').value || 30;
+      if (g('cc-toBia')) CFG.toBia = g('cc-toBia').checked;
+      if (g('cc-toContr')) CFG.toContr = g('cc-toContr').checked;
+      if (g('cc-slaMB')) CFG.slaMB = +g('cc-slaMB').value || 15;
+      if (g('cc-slaIN')) CFG.slaIN = +g('cc-slaIN').value || 20;
+      localStorage.setItem('cc_cfg', JSON.stringify(CFG));
+    }
+    function ccRenderEmails() {
+      const cont = [...new Set(gestionables().filter(e => seg(e.ubic) === 'Contratista').map(e => e.ubic))].sort();
+      const box = document.getElementById('cc-emails'); if (!box) return;
+      box.innerHTML = cont.length ? cont.map(c => `<div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11px;color:var(--t2);min-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${c}">${c}</span>
+        <input class="mini" style="flex:1" placeholder="correo@contratista.com" value="${CFG.emails[c] || ''}" oninput="CFG.emails['${c.replace(/'/g, "\\'")}']=this.value;localStorage.setItem('cc_cfg',JSON.stringify(CFG))"></div>`).join('') : '<div class="cc-help">No hay contratistas en la población gestionable.</div>';
+    }
+
+    /* ===================== #1 ALERTAS PREVENTIVAS ===================== */
+    function ccAlertas() {
+      const g = gestionables(), wins = winList(), bucket = {}; wins.forEach(w => bucket[w] = []);
+      let venc = [];
+      g.forEach(e => { if (e._d < 0) { venc.push(e); return; } const w = wins.find(w => e._d <= w); if (w !== undefined) bucket[w].push(e); });
+      const segOk = e => (CFG.toBia && seg(e.ubic) === 'Bia') || (CFG.toContr && seg(e.ubic) === 'Contratista') || seg(e.ubic) === 'Lab';
+      const kpis = wins.map(w => [`≤ ${w} días`, bucket[w].filter(segOk).length, w <= 7 ? 'var(--danger)' : w <= 15 ? 'var(--warn)' : 'var(--info)']);
+      document.getElementById('cc-alkpi').innerHTML = kpis.map(([l, v, c]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div></div>`).join('') || '<div class="cc-help">Configura al menos una ventana.</div>';
+      let html = '';
+      wins.forEach(w => {
+        const arr = bucket[w].filter(segOk).sort((a, b) => a._d - b._d); if (!arr.length) return;
+        const bia = arr.filter(e => seg(e.ubic) === 'Bia').length, con = arr.filter(e => seg(e.ubic) === 'Contratista').length;
+        html += `<div style="margin-top:16px"><div style="font-size:12px;font-weight:700;margin-bottom:8px">Ventana ≤ ${w} días · ${arr.length} equipos <span style="color:var(--t3);font-weight:400;font-family:var(--mono)">(Bia ${bia} · contratistas ${con})</span></div>
+          <table><thead><tr><th>Serial</th><th>SKU</th><th>Destino</th><th>Días</th><th>Avisar a</th></tr></thead><tbody>${arr.slice(0, 40).map(e => { const sg = seg(e.ubic); const to = sg === 'Bia' ? 'Supply (Bia)' : sg === 'Contratista' ? (CFG.emails[e.ubic] || '<span style="color:var(--warn)">falta correo</span>') : 'Supply (lab)'; return `<tr style="cursor:pointer" onclick="ccSelect('${(e.serial + '').replace(/'/g, "\\'")}',true)"><td class="mc">${e.serial}</td><td class="nc">${e.sku}</td><td>${e.ubic}</td><td style="font-family:var(--mono);font-weight:700;color:${dColor(e._d)}">+${e._d}</td><td style="font-size:11px">${to}</td></tr>`; }).join('')}</tbody></table>${arr.length > 40 ? `<div class="cc-help">+${arr.length - 40} más…</div>` : ''}</div>`;
+      });
+      const total = wins.reduce((s, w) => s + bucket[w].filter(segOk).length, 0);
+      document.getElementById('cc-allist').innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+        <button class="cc-btn go" onclick="ccSimular(${total})">Simular envío (${total})</button>
+        <span class="cc-conn">envío real · Apps Script (cron 7 AM) + dedupe en Sheet</span></div>
+        ${html || '<div class="cc-help">No hay equipos dentro de las ventanas configuradas.</div>'}
+        ${venc.length ? `<div class="cc-help" style="margin-top:10px">Además hay <b style="color:#fca5a5">${venc.length} ya vencidos</b> (fuera de ventana preventiva) — ver Resumen / Equipos.</div>` : ''}`;
+    }
+    function ccSimular(n) { toast(`🔌 Simulado: hoy se enviarían ${n} alertas. Conecta Apps Script para el envío real.`, 's'); }
+
+    /* ===================== #3 DESASIGNACIÓN + IMPACTO ===================== */
+    function ccDesasig() {
+      const w = CFG.deswin || 30;
+      const risk = ALL.filter(e => e.estado === 'ASIGNADO' && !e._acc && e._d != null && e._d <= w);
+      const venc = risk.filter(e => e._d < 0).length;
+      const byC = {}; risk.forEach(e => byC[e.ubic || '(s/u)'] = (byC[e.ubic || '(s/u)'] || 0) + 1);
+      const kpi = [['En riesgo', risk.length, 'var(--purple)'], ['Ya vencidos', venc, '#fca5a5'], ['Sedes/contratistas', Object.keys(byC).length, 'var(--info)']];
+      document.getElementById('cc-deskpi').innerHTML = kpi.map(([l, v, c]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div></div>`).join('');
+      document.getElementById('cc-desbars').innerHTML = barsHTML(Object.entries(byC).sort((a, b) => b[1] - a[1]).slice(0, 10), 'var(--purple)');
+      document.getElementById('cc-deslist').innerHTML = risk.length ? `<table><thead><tr><th>Serial</th><th>SKU</th><th>Sede</th><th>Días</th></tr></thead><tbody>${risk.sort((a, b) => a._d - b._d).map(e => `<tr style="cursor:pointer" onclick="ccSelect('${(e.serial + '').replace(/'/g, "\\'")}',true)"><td class="mc">${e.serial}</td><td class="nc">${e.sku}</td><td>${e.ubic}</td><td style="font-family:var(--mono);font-weight:700;color:${dColor(e._d)}">${e._d < 0 ? e._d : '+' + e._d}</td></tr>`).join('')}</tbody></table>` : '<div class="cc-help">Sin equipos asignados en riesgo en esta ventana 🎉</div>';
+    }
+
+    /* ===================== #2 ENVÍOS A LAB (carga de archivo) ===================== */
+    function loadSheetJS() { return new Promise((res, rej) => { if (window.XLSX) return res(); const s = document.createElement('script'); s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'; s.onload = () => res(); s.onerror = () => rej(new Error('no se pudo cargar el lector de Excel (sin internet). Usa CSV.')); document.head.appendChild(s); }); }
+    const cell = v => (v == null ? '' : String(v)).trim();
+    function detectCols(header) { const h = header.map(x => cell(x).toLowerCase()); return { s: h.findIndex(x => /serial|serie/.test(x)), p: h.findIndex(x => /prov|lab|destino/.test(x)), f: h.findIndex(x => /fecha|env|date/.test(x)) }; }
+    function ingestRows(rows) {
+      rows = rows.filter(r => r && r.length); if (!rows.length) { toast('El archivo está vacío', 'e'); return; }
+      const col = detectCols(rows[0]);
+      if (col.s < 0 || col.f < 0) { toast('No encuentro columnas serial/fecha. Usa la plantilla.', 'e'); return; }
+      let n = 0;
+      rows.slice(1).forEach(r => { const serial = cell(r[col.s]); if (!serial) return; let prov = col.p >= 0 ? cell(r[col.p]).toUpperCase() : ''; prov = /METRO/.test(prov) ? 'METROBIT' : /INPEL/.test(prov) ? 'INPEL' : prov; ENVIOS[serial] = { prov, fecha: cell(r[col.f]) }; n++; });
+      localStorage.setItem('cc_envios', JSON.stringify(ENVIOS));
+      toast(`✓ ${n} envíos cargados`, 's'); ccLab();
+    }
+    async function ccUploadEnvios(input) {
+      const f = input.files[0]; if (!f) return;
+      try {
+        if (/\.csv$/i.test(f.name)) {
+          const text = await f.text(), lines = text.split(/\r?\n/).filter(l => l.trim());
+          const delim = (lines[0].match(/;/g) || []).length > (lines[0].match(/,/g) || []).length ? ';' : ',';
+          ingestRows(lines.map(l => l.split(delim)));
+        } else {
+          await loadSheetJS();
+          const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+          ingestRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' }));
+        }
+      } catch (e) { toast('No se pudo leer: ' + (e.message || e), 'e'); }
+      input.value = '';
+    }
+    function ccTemplate() {
+      const csv = 'serial;proveedor;fecha\n241558009;METROBIT;15/04/2026\n62120944;INPEL;02/05/2026\n';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = 'plantilla_envios_laboratorio.csv'; a.click(); toast('Plantilla descargada', 's');
+    }
+    function ccDemoEnvios() {
+      const labs = ALL.filter(e => /INPEL|METROBIT/i.test(e.ubic) && !e._acc).slice(0, 40);
+      labs.forEach((e, i) => { const d = new Date(TODAY); d.setDate(d.getDate() - (5 + (i * 37) % 40)); ENVIOS[e.serial] = { prov: /METRO/i.test(e.ubic) ? 'METROBIT' : 'INPEL', fecha: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }; });
+      localStorage.setItem('cc_envios', JSON.stringify(ENVIOS));
+      toast('Ejemplo cargado (fechas de envío ficticias para ver el SLA)', 's'); ccLab();
+    }
+    function ccClearEnvios() { ENVIOS = {}; localStorage.removeItem('cc_envios'); toast('Envíos borrados', 's'); ccLab(); }
+
+    /* ===================== NAV / CARGA ===================== */
+    function ccSec(name) {
+      document.querySelectorAll('.cc-sec').forEach(s => s.style.display = s.id === 'sec-' + name ? 'block' : 'none');
+      document.querySelectorAll('.cc-pillnav').forEach(p => p.classList.toggle('active', p.dataset.sec === name));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function toast(msg, type = 's') {
+      const t = document.getElementById('toast'), m = document.getElementById('tmsg');
+      m.textContent = msg; t.className = `toast show ${type}`;
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+    function setSrc(txt, live) {
+      const el = document.getElementById('cc-src'), dot = document.getElementById('cc-srcdot');
+      document.getElementById('cc-srctxt').textContent = txt;
+      const col = live ? 'var(--accent)' : 'var(--warn)';
+      el.style.color = col; el.style.background = live ? 'rgba(74,222,128,.1)' : 'rgba(251,191,36,.1)';
+      el.style.borderColor = live ? 'rgba(74,222,128,.25)' : 'rgba(251,191,36,.25)';
+      dot.style.background = col; dot.style.boxShadow = `0 0 6px ${col}`;
+    }
+    function renderAll() { ccApplyCfg(); ccResumen(); ccFillSelects(); ccRenderTabla(); ccRenderGestion(); ccRenderEmails(); ccAlertas(); ccDesasig(); ccLab(); ccAnalisis(); ccAudit(); }
+
+    async function ccLoad() {
+      for (const url of ['mb-data.json', 'mb-data-mini.json']) {
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) continue;
+          const arr = await res.json();
+          if (Array.isArray(arr) && arr.length) {
+            ALL = arr.map(norm);
+            setSrc(`Datos reales · ${arr.length.toLocaleString()} equipos`, true);
+            renderAll(); return;
+          }
+        } catch (e) { /* sigue al fallback */ }
+      }
+      ALL = CC_SAMPLE.map(norm);
+      setSrc(`Muestra real · ${CC_SAMPLE.length} equipos · sírvelo en web para los 10.189`, false);
+      renderAll();
+    }
+    ccLoad();
+  </script>
+</body>
+
+</html>
