@@ -110,30 +110,29 @@ function esGestionable(e) {
 
 /* ============================ FUENTE DE DATOS =========================== */
 /**
- * Devuelve el inventario completo (array de objetos crudos).
- * Por defecto lee el snapshot mb-data.json. Para datos en vivo, reemplaza
- * el cuerpo por una consulta a una card de inventario completo de Metabase
- * (ver bloque comentado abajo).
+ * Devuelve el inventario completo EN VIVO desde Metabase.
+ * Usa la card 18021 "Inventario WMS" que devuelve todos los equipos.
+ * Requiere: PropertiesService.getScriptProperties().setProperty('MB_KEY', 'tu-api-key')
  */
 function obtenerInventario() {
-  const resp = UrlFetchApp.fetch(CONFIG.DATA_URL, { muteHttpExceptions: true });
-  if (resp.getResponseCode() !== 200) {
-    throw new Error('No se pudo leer DATA_URL (' + resp.getResponseCode() + '). Revisa la URL pública de mb-data.json.');
-  }
-  return JSON.parse(resp.getContentText());
+  const MB_KEY = PropertiesService.getScriptProperties().getProperty('MB_KEY');
+  if (!MB_KEY) throw new Error('Falta la API key de Metabase. Configúrala así:\n  PropertiesService.getScriptProperties().setProperty("MB_KEY", "tu-api-key-aquí")');
 
-  /* ---- ALTERNATIVA EN VIVO (cuando tengas una card de inventario completo) ----
-  const CARD = 99999; // <- ID de la card de Metabase que devuelve TODO el inventario
+  const CARD = 18021; // "Inventario WMS" — datos EN VIVO del inventario completo
   const r = UrlFetchApp.fetch('https://bia.metabaseapp.com/api/card/' + CARD + '/query/json', {
     method: 'post', contentType: 'application/json',
-    headers: { 'x-api-key': PropertiesService.getScriptProperties().getProperty('MB_KEY') },
+    headers: { 'x-api-key': MB_KEY },
     payload: JSON.stringify({}), muteHttpExceptions: true
   });
+
+  if (r.getResponseCode() !== 200) {
+    throw new Error('Error consultando Metabase card ' + CARD + ': ' + r.getResponseCode() + ' ' + r.getContentText());
+  }
+
   return JSON.parse(r.getContentText()).map(row => ({
     serial: row.serial, sku: row.sku, estado: row.estado, marca: row.marca,
     ubicacion: row.ubicacion, venc_conf: row.venc_conf, venc_calib: row.venc_calib
   }));
-  ------------------------------------------------------------------------------ */
 }
 
 /* ============================ CÁLCULO DE ALERTAS ======================== */
