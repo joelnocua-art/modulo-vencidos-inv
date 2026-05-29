@@ -2906,6 +2906,26 @@
     function renderAll() { ccApplyCfg(); ccHoy(); ccResumen(); ccFillSelects(); ccRenderTabla(); ccRenderGestion(); ccRenderEmails(); ccAlertas(); ccDesasig(); ccLab(); ccAnalisis(); ccAudit(); }
 
     async function ccLoad() {
+      // Intenta datos EN VIVO de Metabase si hay API key
+      const mbKey = localStorage.getItem('cc_mb_key');
+      if (mbKey) {
+        try {
+          const res = await fetch('/api/metabase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ serial: '*', apiKey: mbKey })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length) {
+              ALL = data.map(norm);
+              setSrc(`EN VIVO desde Metabase · ${data.length.toLocaleString()} equipos`, true);
+              renderAll(); return;
+            }
+          }
+        } catch (e) { /* continúa al fallback */ }
+      }
+      // Fallback: intenta los snapshots JSON
       for (const url of ['mb-data.json', 'mb-data-mini.json']) {
         try {
           const res = await fetch(url, { cache: 'no-store' });
