@@ -1,0 +1,2575 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="theme-color" content="#4ade80">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Inventario BIA">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CertControl · Gestión de Vencidos · BIA</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --s1: #111418;
+      --s2: #181c22;
+      --s3: #1e242c;
+      --b1: #232930;
+      --b2: #2d3540;
+      --b3: #3a4452;
+      --accent: #4ade80;
+      --accent2: #22c55e;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --info: #60a5fa;
+      --purple: #a78bfa;
+      --t1: #eaecf2;
+      --t2: #8b93a8;
+      --t3: #4d5668;
+      --mono: 'DM Mono', monospace;
+      --sans: 'Syne', sans-serif;
+      --r6: 6px;
+      --r8: 8px;
+      --r12: 12px;
+      --r16: 16px
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--t1);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden
+    }
+
+    /* LOGIN */
+    #login-screen {
+      display: flex;
+      min-height: 100vh;
+      position: relative;
+      overflow: hidden
+    }
+
+    .lbg {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 20% 50%, rgba(74, 222, 128, .06) 0%, transparent 60%), radial-gradient(ellipse 60% 80% at 80% 20%, rgba(96, 165, 250, .04) 0%, transparent 60%)
+    }
+
+    .lgrid {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(var(--b1) 1px, transparent 1px), linear-gradient(90deg, var(--b1) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: .4
+    }
+
+    .lleft {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 4rem;
+      position: relative;
+      z-index: 1
+    }
+
+    .ldot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 20px var(--accent);
+      display: inline-block;
+      margin-right: 10px;
+      animation: glow 2s infinite;
+      vertical-align: middle
+    }
+
+    @keyframes glow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 20px var(--accent)
+      }
+
+      50% {
+        box-shadow: 0 0 40px var(--accent), 0 0 60px rgba(74, 222, 128, .3)
+      }
+    }
+
+    .lbrand-name {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      vertical-align: middle
+    }
+
+    .lbrand-sub {
+      font-size: 12px;
+      color: var(--t3);
+      font-family: var(--mono);
+      margin-top: 6px;
+      margin-left: 22px
+    }
+
+    .ltagline {
+      font-size: 40px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 2rem 0 1rem;
+      max-width: 380px
+    }
+
+    .ltagline span {
+      color: var(--accent)
+    }
+
+    .ldesc {
+      font-size: 14px;
+      color: var(--t2);
+      line-height: 1.7;
+      max-width: 340px
+    }
+
+    .lright {
+      width: 420px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      position: relative;
+      z-index: 1
+    }
+
+    .lcard {
+      background: var(--s1);
+      border: 1px solid var(--b2);
+      border-radius: var(--r16);
+      padding: 2.5rem;
+      width: 100%
+    }
+
+    .ltitle {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px
+    }
+
+    .lsub {
+      font-size: 13px;
+      color: var(--t2);
+      margin-bottom: 2rem
+    }
+
+    .field {
+      margin-bottom: 1.25rem
+    }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      color: var(--t2);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-family: var(--mono);
+      margin-bottom: 7px
+    }
+
+    .field input {
+      width: 100%;
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      padding: 11px 14px;
+      font-size: 14px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      transition: border-color .2s
+    }
+
+    .field input:focus {
+      border-color: var(--accent)
+    }
+
+    .field input::placeholder {
+      color: var(--t3)
+    }
+
+    .lbtn {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #0b0d10;
+      border: none;
+      border-radius: var(--r8);
+      font-size: 14px;
+      font-weight: 700;
+      font-family: var(--sans);
+      cursor: pointer;
+      transition: all .2s;
+      letter-spacing: .04em
+    }
+
+    .lbtn:hover {
+      background: var(--accent2);
+      transform: translateY(-1px)
+    }
+
+    .lerr {
+      font-size: 12px;
+      color: var(--danger);
+      margin-top: 10px;
+      text-align: center;
+      font-family: var(--mono);
+      display: none
+    }
+
+    .lerr.show {
+      display: block
+    }
+
+    @media(max-width:768px) {
+      .lleft {
+        display: none
+      }
+
+      .lright {
+        width: 100%
+      }
+    }
+
+    /* APP */
+    #app-screen {
+      display: none;
+      flex-direction: column;
+      min-height: 100vh
+    }
+
+    /* HEADER */
+    .hdr {
+      background: var(--s1);
+      border-bottom: 1px solid var(--b1);
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+      position: sticky;
+      top: 0;
+      z-index: 100
+    }
+
+    .hlogo {
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .hdot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: glow 2s infinite
+    }
+
+    .hname {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase
+    }
+
+    .hright {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .uchip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--s2);
+      border: 1px solid var(--b1);
+      border-radius: 20px;
+      padding: 5px 12px 5px 5px;
+      font-size: 12px;
+      color: var(--t2)
+    }
+
+    .uav {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0
+    }
+
+    .av-admin {
+      background: rgba(167, 139, 250, .2);
+      color: var(--purple)
+    }
+
+    .av-op {
+      background: rgba(74, 222, 128, .15);
+      color: var(--accent)
+    }
+
+    .rbadge {
+      font-size: 10px;
+      font-family: var(--mono);
+      padding: 2px 7px;
+      border-radius: 10px
+    }
+
+    .rb-admin {
+      background: rgba(167, 139, 250, .15);
+      color: var(--purple)
+    }
+
+    .rb-op {
+      background: rgba(74, 222, 128, .12);
+      color: var(--accent)
+    }
+
+    .lout {
+      font-size: 12px;
+      padding: 5px 12px;
+      border: 1px solid var(--b2);
+      border-radius: var(--r6);
+      background: transparent;
+      color: var(--t3);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .lout:hover {
+      border-color: var(--danger);
+      color: var(--danger)
+    }
+
+    /* NAV */
+    .nav {
+      background: var(--s1);
+      border-bottom: 1px solid var(--b1);
+      padding: 0 1.5rem;
+      display: flex;
+      overflow-x: auto
+    }
+
+    .ntab {
+      padding: 13px 18px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--t3);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      background: none;
+      font-family: var(--sans);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      transition: color .2s
+    }
+
+    .ntab:hover {
+      color: var(--t2)
+    }
+
+    .ntab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent)
+    }
+
+    .ntab.hidden {
+      display: none
+    }
+
+    /* MAIN */
+    .main {
+      padding: 1.5rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%
+    }
+
+    /* STATS */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 1.5rem
+    }
+
+    .sc {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 1.1rem 1.25rem;
+      cursor: pointer;
+      transition: border-color .2s
+    }
+
+    .sc:hover {
+      border-color: var(--b2)
+    }
+
+    .sc.on {
+      border-color: var(--accent)
+    }
+
+    .sc-lbl {
+      font-size: 10px;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-family: var(--mono);
+      margin-bottom: 7px
+    }
+
+    .sc-val {
+      font-size: 28px;
+      font-weight: 800
+    }
+
+    .v-blue {
+      color: var(--info)
+    }
+
+    .v-green {
+      color: var(--accent)
+    }
+
+    .v-yellow {
+      color: var(--warn)
+    }
+
+    .v-purple {
+      color: var(--purple)
+    }
+
+    /* FILTERS */
+    .fbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 1.1rem;
+      flex-wrap: wrap;
+      align-items: center
+    }
+
+    .srch {
+      position: relative;
+      flex: 1;
+      min-width: 180px
+    }
+
+    .srch svg {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--t3);
+      pointer-events: none
+    }
+
+    .srch input {
+      width: 100%;
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r8);
+      padding: 9px 12px 9px 34px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      transition: border-color .2s
+    }
+
+    .srch input:focus {
+      border-color: var(--accent)
+    }
+
+    .srch input::placeholder {
+      color: var(--t3)
+    }
+
+    select.fsel {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r8);
+      padding: 9px 12px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      cursor: pointer
+    }
+
+    select.fsel:focus {
+      border-color: var(--accent)
+    }
+
+    .cbtn {
+      font-size: 12px;
+      padding: 8px 13px;
+      border: 1px solid var(--b1);
+      border-radius: var(--r8);
+      background: transparent;
+      color: var(--t3);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .cbtn:hover {
+      border-color: var(--b2);
+      color: var(--t1)
+    }
+
+    .pbtn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      padding: 9px 16px;
+      border: none;
+      border-radius: var(--r8);
+      background: var(--accent);
+      color: #0b0d10;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700;
+      transition: all .2s
+    }
+
+    .pbtn:hover {
+      background: var(--accent2)
+    }
+
+    /* TABLE */
+    .twrap {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      overflow: hidden
+    }
+
+    .thead2 {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--b1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between
+    }
+
+    .tcnt {
+      font-size: 11px;
+      color: var(--t3);
+      font-family: var(--mono)
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 10px;
+      color: var(--t3);
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      font-family: var(--mono);
+      border-bottom: 1px solid var(--b1);
+      background: var(--s2);
+      cursor: pointer;
+      white-space: nowrap
+    }
+
+    th:hover {
+      color: var(--t2)
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--b1);
+      font-size: 13px;
+      vertical-align: middle
+    }
+
+    tr:last-child td {
+      border-bottom: none
+    }
+
+    tr:hover td {
+      background: var(--s2)
+    }
+
+    .mc {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--info);
+      font-weight: 500
+    }
+
+    .nc {
+      color: var(--t1);
+      max-width: 200px;
+      font-size: 12px;
+      line-height: 1.4
+    }
+
+    .uc {
+      font-size: 12px;
+      color: var(--t2);
+      display: flex;
+      align-items: center;
+      gap: 4px
+    }
+
+    .ec {
+      font-size: 11px;
+      color: var(--t3);
+      font-family: var(--mono)
+    }
+
+    /* BADGES */
+    .bdg {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-weight: 600;
+      letter-spacing: .03em;
+      font-family: var(--mono)
+    }
+
+    .bdg-disp {
+      background: rgba(74, 222, 128, .1);
+      color: var(--accent);
+      border: 1px solid rgba(74, 222, 128, .2)
+    }
+
+    .bdg-pend {
+      background: rgba(251, 191, 36, .1);
+      color: var(--warn);
+      border: 1px solid rgba(251, 191, 36, .2)
+    }
+
+    .bdg-inst {
+      background: rgba(96, 165, 250, .1);
+      color: var(--info);
+      border: 1px solid rgba(96, 165, 250, .2)
+    }
+
+    .bdot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0
+    }
+
+    .bdg-disp .bdot {
+      background: var(--accent)
+    }
+
+    .bdg-pend .bdot {
+      background: var(--warn)
+    }
+
+    .bdg-inst .bdot {
+      background: var(--info)
+    }
+
+    /* BTNS */
+    .sbtn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      padding: 6px 12px;
+      border: 1px solid var(--b1);
+      border-radius: var(--r6);
+      background: transparent;
+      color: var(--t2);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .sbtn:hover {
+      border-color: var(--b2);
+      color: var(--t1)
+    }
+
+    /* EMPTY/LOADING */
+    .empty {
+      text-align: center;
+      padding: 3.5rem 2rem;
+      color: var(--t3)
+    }
+
+    .empty h3 {
+      font-size: 15px;
+      color: var(--t2);
+      margin-bottom: 5px
+    }
+
+    .spin {
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--b2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 12px
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .loading {
+      text-align: center;
+      padding: 3.5rem;
+      color: var(--t2);
+      font-size: 13px
+    }
+
+    /* PFORM */
+    .pform {
+      max-width: 560px;
+      margin: 0 auto
+    }
+
+    .pcard {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 1.75rem;
+      margin-bottom: 1rem
+    }
+
+    .flbl {
+      display: block;
+      font-size: 10px;
+      color: var(--t2);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-family: var(--mono);
+      margin-bottom: 6px
+    }
+
+    .flbl span {
+      color: var(--danger)
+    }
+
+    .finp {
+      width: 100%;
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      padding: 10px 13px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      transition: border-color .2s
+    }
+
+    .finp:focus {
+      border-color: var(--accent)
+    }
+
+    .finp::placeholder {
+      color: var(--t3)
+    }
+
+    .fsel2 {
+      width: 100%;
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      padding: 10px 13px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      cursor: pointer
+    }
+
+    .fsel2:focus {
+      border-color: var(--accent)
+    }
+
+    .fgrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px
+    }
+
+    .fg {
+      display: flex;
+      flex-direction: column;
+      gap: 6px
+    }
+
+    .phzone {
+      border: 2px dashed var(--b2);
+      border-radius: var(--r8);
+      padding: 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s;
+      position: relative;
+      overflow: hidden
+    }
+
+    .phzone:hover {
+      border-color: var(--accent)
+    }
+
+    .phzone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer
+    }
+
+    .phprev {
+      width: 100%;
+      max-height: 160px;
+      object-fit: cover;
+      border-radius: var(--r6);
+      display: none
+    }
+
+    .phph {
+      color: var(--t3);
+      font-size: 13px
+    }
+
+    .cambtn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      margin-top: 8px;
+      font-size: 12px;
+      padding: 8px;
+      border: 1px solid var(--b2);
+      border-radius: var(--r6);
+      background: transparent;
+      color: var(--t2);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .cambtn:hover {
+      border-color: var(--b3);
+      color: var(--t1)
+    }
+
+    .savebtn {
+      font-size: 13px;
+      padding: 10px 22px;
+      border: none;
+      border-radius: var(--r8);
+      background: var(--accent);
+      color: #0b0d10;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700;
+      transition: all .2s
+    }
+
+    .savebtn:hover {
+      background: var(--accent2)
+    }
+
+    .savebtn:disabled {
+      opacity: .4;
+      cursor: not-allowed
+    }
+
+    .cncl {
+      font-size: 13px;
+      padding: 10px 18px;
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      background: transparent;
+      color: var(--t2);
+      cursor: pointer;
+      font-family: var(--sans)
+    }
+
+    /* AUDIT */
+    .aitem {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 1rem 1.25rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px
+    }
+
+    .aitem:hover {
+      border-color: var(--b2)
+    }
+
+    .adot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-top: 5px;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px var(--accent)
+    }
+
+    .aser {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--info);
+      font-weight: 500;
+      margin-bottom: 3px
+    }
+
+    .ainf {
+      font-size: 13px;
+      color: var(--t1);
+      line-height: 1.5
+    }
+
+    .atim {
+      font-size: 10px;
+      color: var(--t3);
+      font-family: var(--mono);
+      margin-top: 4px
+    }
+
+    .autag {
+      font-size: 10px;
+      font-family: var(--mono);
+      background: rgba(167, 139, 250, .12);
+      color: var(--purple);
+      padding: 1px 7px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-left: 6px
+    }
+
+    .aph {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: var(--r6);
+      margin-left: auto;
+      flex-shrink: 0
+    }
+
+    /* ADMIN */
+    .agrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem
+    }
+
+    .acard {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 1.5rem
+    }
+
+    .actitle {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--t2);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: 1.25rem
+    }
+
+    .urow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--b1)
+    }
+
+    .urow:last-child {
+      border-bottom: none
+    }
+
+    .uname {
+      font-size: 13px;
+      font-weight: 600;
+      flex: 1
+    }
+
+    .ubodega {
+      font-size: 11px;
+      color: var(--t3);
+      font-family: var(--mono)
+    }
+
+    .urole {
+      font-size: 10px;
+      font-family: var(--mono);
+      padding: 2px 8px;
+      border-radius: 10px
+    }
+
+    .ur-admin {
+      background: rgba(167, 139, 250, .15);
+      color: var(--purple)
+    }
+
+    .ur-op {
+      background: rgba(74, 222, 128, .12);
+      color: var(--accent)
+    }
+
+    .delbtn {
+      font-size: 11px;
+      padding: 3px 8px;
+      border: 1px solid var(--b2);
+      border-radius: var(--r6);
+      background: transparent;
+      color: var(--t3);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .2s
+    }
+
+    .delbtn:hover {
+      border-color: var(--danger);
+      color: var(--danger)
+    }
+
+    .addform {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--b1)
+    }
+
+    .mini {
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r6);
+      padding: 8px 10px;
+      font-size: 12px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none;
+      width: 100%
+    }
+
+    .mini:focus {
+      border-color: var(--accent)
+    }
+
+    .addbtn {
+      font-size: 12px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: var(--r6);
+      background: var(--accent);
+      color: #0b0d10;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700
+    }
+
+    .addbtn:hover {
+      background: var(--accent2)
+    }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r12);
+      padding: 12px 18px;
+      font-size: 13px;
+      color: var(--t1);
+      z-index: 500;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      max-width: 300px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .4)
+    }
+
+    .toast.show {
+      display: flex;
+      animation: slide .3s ease
+    }
+
+    .toast.s {
+      border-color: var(--accent)
+    }
+
+    .toast.e {
+      border-color: var(--danger)
+    }
+
+    .tdot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0
+    }
+
+    .toast.s .tdot {
+      background: var(--accent)
+    }
+
+    .toast.e .tdot {
+      background: var(--danger)
+    }
+
+    @keyframes slide {
+      from {
+        transform: translateY(16px);
+        opacity: 0
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1
+      }
+    }
+
+    .saving {
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--warn);
+      display: none;
+      align-items: center;
+      gap: 6px
+    }
+
+    .saving.show {
+      display: flex
+    }
+
+    @media(max-width:768px) {
+      .stats {
+        grid-template-columns: 1fr 1fr
+      }
+
+      .main {
+        padding: 1rem
+      }
+
+      .fgrid {
+        grid-template-columns: 1fr
+      }
+
+      .agrid {
+        grid-template-columns: 1fr
+      }
+
+      table {
+        font-size: 12px
+      }
+
+      td,
+      th {
+        padding: 8px 10px
+      }
+    }
+
+    /* ===================================================================== */
+    /* ===== CERTCONTROL · MÓDULO DE VENCIDOS (maqueta, sin conexión) ====== */
+    /* ===================================================================== */
+    a.ntab,
+    a.lout {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center
+    }
+
+    .cc-pill {
+      margin-left: 10px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(74, 222, 128, .12);
+      border: 1px solid rgba(74, 222, 128, .3);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: .06em;
+      text-transform: uppercase
+    }
+
+    .cc-demo {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--warn);
+      background: rgba(251, 191, 36, .1);
+      border: 1px solid rgba(251, 191, 36, .25);
+      padding: 5px 10px;
+      border-radius: 999px;
+      letter-spacing: .04em
+    }
+
+    .cc-demo::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--warn);
+      box-shadow: 0 0 6px var(--warn)
+    }
+
+    .cc-hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-bottom: 1.25rem
+    }
+
+    .cc-hero h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -.01em
+    }
+
+    .cc-hero .sub {
+      font-size: 13px;
+      color: var(--t2);
+      margin-top: 5px;
+      max-width: 580px;
+      line-height: 1.6
+    }
+
+    .cc-int {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: rgba(96, 165, 250, .07);
+      border: 1px solid rgba(96, 165, 250, .22);
+      border-radius: var(--r12);
+      padding: 12px 14px;
+      font-size: 12px;
+      color: var(--t2);
+      line-height: 1.6;
+      margin-bottom: 1.5rem
+    }
+
+    .cc-int b {
+      color: var(--info)
+    }
+
+    .cc-int .ico {
+      flex-shrink: 0;
+      font-size: 15px
+    }
+
+    .cc-subnav {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--b1)
+    }
+
+    .cc-pillnav {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--t2);
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 13px;
+      cursor: pointer;
+      transition: all .15s;
+      margin-bottom: -1px
+    }
+
+    .cc-pillnav:hover {
+      color: var(--t1)
+    }
+
+    .cc-pillnav.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent)
+    }
+
+    .cc-grid {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 1.5rem
+    }
+
+    .cc-grid.k6 {
+      grid-template-columns: repeat(6, 1fr)
+    }
+
+    .cc-grid.k4 {
+      grid-template-columns: repeat(4, 1fr)
+    }
+
+    .cc-grid.k3 {
+      grid-template-columns: repeat(3, 1fr)
+    }
+
+    .cc-grid.k2 {
+      grid-template-columns: 1fr 1fr
+    }
+
+    @media (max-width:1100px) {
+      .cc-grid.k6 {
+        grid-template-columns: repeat(3, 1fr)
+      }
+
+      .cc-grid.k4 {
+        grid-template-columns: repeat(2, 1fr)
+      }
+    }
+
+    @media (max-width:680px) {
+
+      .cc-grid.k6,
+      .cc-grid.k4,
+      .cc-grid.k3,
+      .cc-grid.k2 {
+        grid-template-columns: 1fr 1fr
+      }
+    }
+
+    .cc-kpi {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 16px;
+      position: relative;
+      overflow: hidden
+    }
+
+    .cc-kpi .strip {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px
+    }
+
+    .cc-kpi .lbl {
+      font-size: 10px;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      font-family: var(--mono);
+      margin-bottom: 10px
+    }
+
+    .cc-kpi .val {
+      font-size: 27px;
+      font-weight: 800;
+      font-family: var(--mono);
+      line-height: 1
+    }
+
+    .cc-kpi .meta {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 8px
+    }
+
+    .cc-card {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 18px
+    }
+
+    .cc-card .ct {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-family: var(--mono);
+      color: var(--t2);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 7px
+    }
+
+    .cc-card .ct .d {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%
+    }
+
+    .cc-sem {
+      display: flex;
+      border-radius: var(--r8);
+      overflow: hidden;
+      height: 34px;
+      margin-bottom: 12px;
+      border: 1px solid var(--b1)
+    }
+
+    .cc-sem .seg {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: #0b0d10
+    }
+
+    .cc-semleg {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--t2)
+    }
+
+    .cc-semleg span {
+      display: flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .cc-semleg i {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      display: inline-block
+    }
+
+    .cc-ring {
+      display: flex;
+      align-items: center;
+      gap: 14px
+    }
+
+    .cc-ring .big {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: var(--mono);
+      color: var(--accent);
+      line-height: 1
+    }
+
+    .cc-ring .rl {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 3px;
+      max-width: 110px;
+      line-height: 1.4
+    }
+
+    .cc-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--mono);
+      white-space: nowrap
+    }
+
+    .cc-chip .dt {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%
+    }
+
+    .ch-ok {
+      background: rgba(74, 222, 128, .12);
+      color: var(--accent)
+    }
+
+    .ch-ok .dt {
+      background: var(--accent)
+    }
+
+    .ch-alert {
+      background: rgba(251, 191, 36, .13);
+      color: var(--warn)
+    }
+
+    .ch-alert .dt {
+      background: var(--warn)
+    }
+
+    .ch-cal {
+      background: rgba(96, 165, 250, .13);
+      color: var(--info)
+    }
+
+    .ch-cal .dt {
+      background: var(--info)
+    }
+
+    .ch-ot {
+      background: rgba(167, 139, 250, .14);
+      color: var(--purple)
+    }
+
+    .ch-ot .dt {
+      background: var(--purple)
+    }
+
+    .ch-block {
+      background: rgba(248, 113, 113, .13);
+      color: var(--danger)
+    }
+
+    .ch-block .dt {
+      background: var(--danger)
+    }
+
+    .ch-exp {
+      background: rgba(248, 113, 113, .22);
+      color: #fca5a5
+    }
+
+    .ch-exp .dt {
+      background: #fca5a5
+    }
+
+    .cc-r {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: var(--r6);
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--mono)
+    }
+
+    .r-exp {
+      background: rgba(248, 113, 113, .2);
+      color: #fca5a5
+    }
+
+    .r-crit {
+      background: rgba(248, 113, 113, .12);
+      color: var(--danger)
+    }
+
+    .r-20 {
+      background: rgba(251, 191, 36, .13);
+      color: var(--warn)
+    }
+
+    .r-30 {
+      background: rgba(96, 165, 250, .12);
+      color: var(--info)
+    }
+
+    .r-ok {
+      background: rgba(74, 222, 128, .1);
+      color: var(--accent)
+    }
+
+    .cc-urg {
+      display: flex;
+      flex-direction: column
+    }
+
+    .cc-urgrow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--b1);
+      cursor: pointer;
+      transition: .12s
+    }
+
+    .cc-urgrow:last-child {
+      border-bottom: none
+    }
+
+    .cc-urgrow:hover {
+      background: var(--s2);
+      margin: 0 -10px;
+      padding-left: 10px;
+      padding-right: 10px;
+      border-radius: var(--r8);
+      border-bottom-color: transparent
+    }
+
+    .cc-urgrow .sr {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--t1);
+      min-width: 76px
+    }
+
+    .cc-urgrow .tp {
+      font-size: 12px;
+      color: var(--t2);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .cc-urgrow .dd {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      min-width: 54px;
+      text-align: right
+    }
+
+    .cc-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    .cc-barrow {
+      display: grid;
+      grid-template-columns: 140px 1fr 58px;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px
+    }
+
+    .cc-barrow .nm {
+      color: var(--t2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .cc-track {
+      height: 8px;
+      background: var(--s3);
+      border-radius: 99px;
+      overflow: hidden
+    }
+
+    .cc-fill {
+      height: 100%;
+      border-radius: 99px
+    }
+
+    .cc-barrow .vv {
+      font-family: var(--mono);
+      text-align: right;
+      color: var(--t1)
+    }
+
+    .cc-tl {
+      position: relative;
+      padding-left: 20px
+    }
+
+    .cc-tl::before {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 4px;
+      bottom: 4px;
+      width: 1px;
+      background: var(--b2)
+    }
+
+    .cc-tlrow {
+      position: relative;
+      padding: 0 0 16px 0
+    }
+
+    .cc-tlrow:last-child {
+      padding-bottom: 0
+    }
+
+    .cc-tlrow .dot {
+      position: absolute;
+      left: -18px;
+      top: 3px;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 2px solid var(--bg)
+    }
+
+    .cc-tlrow .hd {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px
+    }
+
+    .cc-tlrow .ac {
+      font-weight: 600;
+      color: var(--t1)
+    }
+
+    .cc-tlrow .tm {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--t3);
+      white-space: nowrap
+    }
+
+    .cc-tlrow .ds {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 3px;
+      line-height: 1.5
+    }
+
+    .cc-lab {
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    .cc-labrow {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 14px
+    }
+
+    .cc-labrow .prov {
+      width: 52px;
+      height: 52px;
+      border-radius: var(--r8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 13px;
+      flex-shrink: 0
+    }
+
+    .cc-labrow .info {
+      flex: 1;
+      min-width: 0
+    }
+
+    .cc-labrow .info .t {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--t1)
+    }
+
+    .cc-labrow .info .s {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 3px
+    }
+
+    .cc-labrow .sla {
+      text-align: right;
+      font-family: var(--mono);
+      font-size: 11px;
+      white-space: nowrap
+    }
+
+    .cc-money .big {
+      font-size: 25px;
+      font-weight: 800;
+      font-family: var(--mono);
+      line-height: 1
+    }
+
+    .cc-money .lbl {
+      font-size: 11px;
+      color: var(--t2);
+      margin-top: 5px
+    }
+
+    .cc-det {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 16px
+    }
+
+    @media (max-width:880px) {
+      .cc-det {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .cc-kv {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--b1)
+    }
+
+    .cc-kv:last-child {
+      border-bottom: none
+    }
+
+    .cc-kv .k {
+      color: var(--t3)
+    }
+
+    .cc-kv .v {
+      color: var(--t1);
+      font-family: var(--mono);
+      text-align: right
+    }
+
+    .cc-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px
+    }
+
+    .cc-btn {
+      border: 1px solid var(--b2);
+      background: var(--s2);
+      color: var(--t1);
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 9px 13px;
+      border-radius: var(--r8);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: .15s
+    }
+
+    .cc-btn:hover {
+      border-color: var(--b3);
+      background: var(--s3)
+    }
+
+    .cc-btn.danger {
+      border-color: rgba(248, 113, 113, .3);
+      color: var(--danger)
+    }
+
+    .cc-btn.danger:hover {
+      background: rgba(248, 113, 113, .08)
+    }
+
+    .cc-btn.go {
+      background: var(--accent);
+      color: #0b0d10;
+      border-color: var(--accent)
+    }
+
+    .cc-btn.go:hover {
+      background: var(--accent2)
+    }
+
+    .cc-conn {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--t3);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--s2);
+      border: 1px dashed var(--b2);
+      padding: 2px 8px;
+      border-radius: 99px;
+      white-space: nowrap
+    }
+
+    .cc-conn::before {
+      content: '🔌';
+      font-size: 9px
+    }
+
+    .cc-dash {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r12);
+      padding: 16px;
+      display: flex;
+      flex-direction: column
+    }
+
+    .cc-dash .dt {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 4px
+    }
+
+    .cc-dash .dd {
+      font-size: 11px;
+      color: var(--t2);
+      line-height: 1.5;
+      margin-bottom: 14px
+    }
+
+    .cc-dash .mini {
+      margin-top: auto
+    }
+
+    .cc-mini-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--b1)
+    }
+
+    .cc-mini-row:last-of-type {
+      border-bottom: none
+    }
+
+    .cc-mini-row .mv {
+      font-family: var(--mono);
+      color: var(--t1)
+    }
+
+    .cc-help {
+      font-size: 11px;
+      color: var(--t3);
+      font-family: var(--mono);
+      margin-top: 8px;
+      line-height: 1.5
+    }
+
+    .cc-fld {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px
+    }
+
+    .cc-fld label {
+      font-size: 11px;
+      color: var(--t2);
+      font-weight: 600
+    }
+
+    .cc-fld input,
+    .cc-fld select {
+      background: var(--s2);
+      border: 1px solid var(--b2);
+      border-radius: var(--r8);
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--t1);
+      font-family: var(--sans);
+      outline: none
+    }
+
+    .cc-fld input:focus,
+    .cc-fld select:focus {
+      border-color: var(--accent)
+    }
+
+    .cc-sectitle {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 4px
+    }
+
+    .cc-secsub {
+      font-size: 12px;
+      color: var(--t2);
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+      max-width: 640px
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app-screen" style="display:block">
+
+    <!-- ===== HEADER (mismo chrome del Inventario) ===== -->
+    <div class="hdr">
+      <div class="hlogo">
+        <div class="hdot"></div>
+        <div class="hname">Inventario BIA</div>
+        <span class="cc-pill">CertControl</span>
+      </div>
+      <div class="hright">
+        <span class="cc-demo">Maqueta · datos de ejemplo</span>
+        <div class="uchip">
+          <div class="uav av-admin">SC</div>
+          <span>Supply Control</span>
+          <span class="rbadge rb-admin">SUPPLY</span>
+        </div>
+        <a class="lout" href="index.html">← Inventario</a>
+      </div>
+    </div>
+
+    <!-- ===== NAV: las demás pestañas vuelven al index; Vencidos activo ===== -->
+    <div class="nav">
+      <a class="ntab" href="index.html">Conteo</a>
+      <a class="ntab" href="index.html">Pistolear</a>
+      <a class="ntab" href="index.html">Admin</a>
+      <a class="ntab" href="index.html">Inventarios</a>
+      <a class="ntab" href="index.html">About</a>
+      <button class="ntab active">Vencidos</button>
+    </div>
+
+    <div class="main">
+
+      <!-- ===== HERO ===== -->
+      <div class="cc-hero">
+        <div>
+          <h1>CertControl · Ciclo de vida de certificaciones</h1>
+          <div class="sub">Gestión <b style="color:var(--t1)">preventiva</b> de vencimientos: alertas escalonadas,
+            bloqueo anticipado, seguimiento de laboratorio y trazabilidad auditable. Complementa el tab
+            <b style="color:var(--t1)">Equipos Vencidos</b> sin duplicar sus métricas.</div>
+        </div>
+        <div class="cc-ring" id="cc-heroring"></div>
+      </div>
+
+      <!-- ===== AVISO DE MAQUETA / PUNTOS DE INTEGRACIÓN ===== -->
+      <div class="cc-int">
+        <span class="ico">🔌</span>
+        <div><b>Vista de demostración (maqueta).</b> Ningún dato es real y ninguna acción se conecta todavía a un
+          sistema. Los puntos de integración están señalados con etiquetas <span class="cc-conn">conectar a …</span>
+          listas para enchufar a <b>Supabase</b> (tablas de gestión), <b>n8n</b> (alertas y bloqueo), <b>Metabase</b>
+          (dashboards) y <b>Voltio WMS</b> (propagación de estado).</div>
+      </div>
+
+      <!-- ===== SUB-NAV DEL MÓDULO ===== -->
+      <div class="cc-subnav">
+        <button class="cc-pillnav active" data-sec="resumen" onclick="ccSec('resumen')">Resumen</button>
+        <button class="cc-pillnav" data-sec="equipos" onclick="ccSec('equipos')">Equipos</button>
+        <button class="cc-pillnav" data-sec="gestion" onclick="ccSec('gestion')">Gestión</button>
+        <button class="cc-pillnav" data-sec="lab" onclick="ccSec('lab')">Laboratorio</button>
+        <button class="cc-pillnav" data-sec="impacto" onclick="ccSec('impacto')">Impacto $</button>
+        <button class="cc-pillnav" data-sec="auditoria" onclick="ccSec('auditoria')">Auditoría</button>
+      </div>
+
+      <!-- ============================= RESUMEN ============================= -->
+      <section id="sec-resumen" class="cc-sec">
+        <div class="cc-grid k6" id="cc-kpis"></div>
+        <div class="cc-grid k2">
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--warn)"></span>Semáforo de vencimientos</div>
+            <div class="cc-sem" id="cc-sem"></div>
+            <div class="cc-semleg" id="cc-semleg"></div>
+            <div class="cc-help">Mismos rangos del tab “Equipos Vencidos”: Vencido · 0–20 · 21–30 · 30+ días.<br>Meta de
+              gestión preventiva: que ningún equipo llegue a la columna “Vencido”.</div>
+          </div>
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--danger)"></span>Equipos que requieren acción</div>
+            <div class="cc-urg" id="cc-urg"></div>
+          </div>
+        </div>
+        <div class="cc-grid k2">
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--info)"></span>Carga por contratista (≤30 días)</div>
+            <div class="cc-bars" id="cc-bars"></div>
+          </div>
+          <div class="cc-card" style="background:linear-gradient(135deg,var(--s1),rgba(74,222,128,.045))">
+            <div class="ct"><span class="d" style="background:var(--accent)"></span>Gestión preventiva</div>
+            <div style="font-size:13px;color:var(--t2);line-height:1.7">El bloqueo no debería ocurrir el día del
+              vencimiento. Con buena gestión, <b style="color:var(--t1)">ningún equipo llega a su fecha de
+                vencimiento</b>: las alertas escalonadas (30/15/7 días) y el bloqueo preventivo configurable interceptan
+              el equipo antes.</div>
+            <div style="display:flex;gap:28px;margin-top:16px">
+              <div class="cc-money">
+                <div class="big" style="color:var(--accent)" id="cc-prev">—</div>
+                <div class="lbl">interceptados a tiempo (ciclo)</div>
+              </div>
+              <div class="cc-money">
+                <div class="big" style="color:#fca5a5" id="cc-slip">—</div>
+                <div class="lbl">llegaron a vencer</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================= EQUIPOS ============================= -->
+      <section id="sec-equipos" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Equipos en seguimiento</div>
+        <div class="cc-secsub">Días a vencer, rango y estado de gestión por equipo. Haz clic en una fila para abrirla en
+          <b>Gestión</b>. Los filtros replican los del tab “Equipos Vencidos” para que los números coincidan.</div>
+        <div class="fbar">
+          <div class="srch">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <input type="text" id="cc-q" placeholder="Buscar serial, tipo, contratista…" oninput="ccRenderTabla()">
+          </div>
+          <select class="fsel" id="cc-fc" onchange="ccRenderTabla()">
+            <option value="">Todos los contratistas</option>
+          </select>
+          <select class="fsel" id="cc-fr" onchange="ccRenderTabla()">
+            <option value="">Todos los rangos</option>
+            <option value="exp">Vencido</option>
+            <option value="0-20">0–20 días</option>
+            <option value="21-30">21–30 días</option>
+            <option value="30+">30+ días</option>
+          </select>
+          <button class="cbtn" onclick="ccClear()">Limpiar</button>
+        </div>
+        <div class="twrap">
+          <div class="thead2">
+            <div class="tcnt" id="cc-cnt">— equipos</div>
+            <span class="cc-conn">origen: Metabase · Supabase cc_equipos</span>
+          </div>
+          <div id="cc-tabla"></div>
+        </div>
+      </section>
+
+      <!-- ============================= GESTIÓN ============================= -->
+      <section id="sec-gestion" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Panel de gestión de certificaciones</div>
+        <div class="cc-secsub">Consulta el estado detallado de un equipo, registra una nueva certificación y ejecuta
+          bloqueo/desbloqueo. Toda acción quedará registrada en el historial (solo Supply).</div>
+        <div style="max-width:280px;margin-bottom:16px">
+          <div class="cc-fld" style="margin-bottom:0">
+            <label>Equipo seleccionado</label>
+            <select id="cc-gsel" onchange="ccSelect(this.value)"></select>
+          </div>
+        </div>
+        <div id="cc-gest"></div>
+      </section>
+
+      <!-- ============================ LABORATORIO ========================= -->
+      <section id="sec-lab" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Seguimiento de laboratorio</div>
+        <div class="cc-secsub">Trazabilidad del flujo bidireccional (salida y retorno) de equipos en calibración entre
+          BIA y los laboratorios externos (METROBIT / INPEL), con control de SLA.</div>
+        <div class="cc-grid k3" id="cc-labkpi"></div>
+        <div class="cc-lab" id="cc-lablist"></div>
+        <div class="cc-help" style="margin-top:14px">SLA de referencia · METROBIT: 15 días · INPEL: 20 días. <span
+            class="cc-conn">conectar a n8n · seguimiento METROBIT/INPEL</span></div>
+      </section>
+
+      <!-- ============================= IMPACTO $ ========================== -->
+      <section id="sec-impacto" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Impacto financiero por ciclos de vencimiento</div>
+        <div class="cc-secsub">Pérdida operativa proyectada, costo de renovación y oportunidad de venta de activos
+          instalados. Métricas de ejemplo para dimensionar el módulo.</div>
+        <div class="cc-grid k4" id="cc-impkpi"></div>
+        <div class="cc-grid k2">
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--danger)"></span>Valor en riesgo por contratista
+              (≤30 días)</div>
+            <div class="cc-bars" id="cc-impbars"></div>
+          </div>
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--accent)"></span>Venta de activos instalados</div>
+            <div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px">Equipos instalados próximos a
+              desvinculación por vencimiento pueden ofrecerse en compra al cliente, facilitando su permanencia en sitio
+              y generando ingreso en lugar de un retiro.</div>
+            <div id="cc-venta"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ AUDITORÍA ========================== -->
+      <section id="sec-auditoria" class="cc-sec" style="display:none">
+        <div class="cc-sectitle">Trazabilidad y dashboards de auditoría</div>
+        <div class="cc-secsub">Log de actividad de solo inserción (inmutable) y los cuatro dashboards de auditoría que
+          complementan el tab “Equipos Vencidos” en Metabase.</div>
+        <div class="cc-grid k2">
+          <div class="cc-card">
+            <div class="ct"><span class="d" style="background:var(--purple)"></span>Log de actividad
+              (solo inserción)</div>
+            <div class="cc-tl" id="cc-log"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="cc-grid k2" style="margin-bottom:0" id="cc-dash"></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <div class="tdot"></div><span id="tmsg"></span>
+  </div>
+
+  <script>
+    /* ===================================================================== */
+    /* ===== CertControl · maqueta · 100% local, sin llamadas de red ======= */
+    /* ===================================================================== */
+    const TODAY = new Date('2026-05-29T00:00:00');
+    const DAY = 86400000;
+    const dParse = s => new Date(s + 'T00:00:00');
+    const daysTo = s => Math.round((dParse(s) - TODAY) / DAY);
+    const fDate = s => { const d = dParse(s); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };
+    const fMoney = n => '$' + n.toLocaleString('es-CO');
+    const fComp = n => n >= 1e6 ? '$' + (n / 1e6).toFixed(1).replace('.0', '') + 'M' : '$' + Math.round(n / 1e3) + 'k';
+
+    /* ---- Equipos demo (no reales) ---- */
+    const E = [
+      { sr: 'TC-00087', tp: 'Transformador de corriente', ct: 'Energía Norte SAS', ub: 'Sitio - Soledad', cal: '2026-05-27', conf: '2026-08-10', est: 'Vencido', val: 7800000, ot: null, lab: null },
+      { sr: 'MD-01456', tp: 'Medidor trifásico', ct: 'ElectriCosta', ub: 'Bia Barranquilla', cal: '2026-08-01', conf: '2026-06-02', est: 'OT en riesgo', val: 3100000, ot: { id: 'OT-20471', tit: 'Instalación medición frontera Soledad', vis: '2026-06-06' }, lab: null },
+      { sr: 'AN-00231', tp: 'Analizador de red', ct: 'RedAndina', ub: 'Bia Bogotá', cal: '2026-06-04', conf: '2026-09-01', est: 'Alerta enviada', val: 9400000, ot: null, lab: null },
+      { sr: 'MD-01502', tp: 'Medidor trifásico', ct: 'ElectriCosta', ub: 'Sitio - Malambo', cal: '2026-09-10', conf: '2026-06-05', est: 'OT en riesgo', val: 3000000, ot: { id: 'OT-20488', tit: 'Cambio de medición industrial', vis: '2026-06-09' }, lab: null },
+      { sr: 'AN-00255', tp: 'Analizador de red', ct: 'RedAndina', ub: 'Bia Bogotá', cal: '2026-06-03', conf: '2026-10-01', est: 'Alerta enviada', val: 9300000, ot: null, lab: null },
+      { sr: 'TC-00112', tp: 'Transformador de corriente', ct: 'Voltaje Caribe', ub: 'Bia Barranquilla', cal: '2026-06-12', conf: '2026-08-20', est: 'Alerta enviada', val: 7500000, ot: null, lab: null },
+      { sr: 'TC-00077', tp: 'Transformador de corriente', ct: 'Energía Norte SAS', ub: 'Bia Barranquilla', cal: '2026-06-08', conf: '2026-09-15', est: 'Bloqueo preventivo', val: 7900000, ot: null, lab: null },
+      { sr: 'MC-00045', tp: 'Macromedidor', ct: 'Energía Norte SAS', ub: 'Bia Medellín', cal: '2026-06-15', conf: '2026-11-01', est: 'Vigente', val: 12200000, ot: null, lab: null },
+      { sr: 'MD-01390', tp: 'Medidor monofásico', ct: 'RedAndina', ub: 'Bia Bogotá', cal: '2026-10-01', conf: '2026-06-18', est: 'Vigente', val: 2900000, ot: null, lab: null },
+      { sr: 'TF-00892', tp: 'Transformador de corriente', ct: 'BIA (interno)', ub: 'Lab METROBIT', cal: '2026-06-22', conf: '2026-09-30', est: 'En calibración', val: 8100000, ot: null, lab: { prov: 'METROBIT', env: '2026-04-14' } },
+      { sr: 'AN-00208', tp: 'Analizador de red', ct: 'Voltaje Caribe', ub: 'Bia Barranquilla', cal: '2026-06-28', conf: '2026-12-01', est: 'Vigente', val: 9100000, ot: null, lab: null },
+      { sr: 'MD-01477', tp: 'Medidor trifásico', ct: 'ElectriCosta', ub: 'Bia Barranquilla', cal: '2026-11-01', conf: '2026-06-26', est: 'Vigente', val: 3050000, ot: { id: 'OT-20455', tit: 'Reposición de medición comercial', vis: '2026-07-20' }, lab: null },
+      { sr: 'MD-01340', tp: 'Medidor monofásico', ct: 'ElectriCosta', ub: 'Lab INPEL', cal: '2026-10-15', conf: '2026-07-10', est: 'En calibración', val: 2800000, ot: null, lab: { prov: 'INPEL', env: '2026-05-12' } },
+      { sr: 'TC-00130', tp: 'Transformador de corriente', ct: 'Energía Norte SAS', ub: 'Bia Medellín', cal: '2026-07-25', conf: '2026-12-15', est: 'Vigente', val: 7600000, ot: null, lab: null },
+      { sr: 'TC-00099', tp: 'Transformador de corriente', ct: 'ElectriCosta', ub: 'Lab METROBIT', cal: '2026-08-30', conf: '2026-11-20', est: 'En calibración', val: 7700000, ot: null, lab: { prov: 'METROBIT', env: '2026-05-22' } },
+      { sr: 'MC-00061', tp: 'Macromedidor', ct: 'RedAndina', ub: 'Bia Medellín', cal: '2026-08-15', conf: '2027-01-10', est: 'Vigente', val: 11900000, ot: null, lab: null },
+      { sr: 'MD-01210', tp: 'Medidor monofásico', ct: 'Voltaje Caribe', ub: 'Bia Bogotá', cal: '2026-09-01', conf: '2027-02-01', est: 'Vigente', val: 2700000, ot: null, lab: null }
+    ];
+    /* fecha de vencimiento más próxima entre las dos certificaciones */
+    E.forEach(e => {
+      const dC = daysTo(e.cal), dF = daysTo(e.conf);
+      e._n = dC <= dF ? { d: dC, tipo: 'Calibración', date: e.cal } : { d: dF, tipo: 'Conformidad', date: e.conf };
+      e._d = e._n.d;
+    });
+
+    /* ---- Activos instalados candidatos a venta (no reales) ---- */
+    const VENTA = [
+      { sr: 'MD-00912', tp: 'Medidor trifásico', cli: 'Frontera Soledad', ant: '3.2 años', of: 1450000 },
+      { sr: 'TC-00043', tp: 'Transformador de corriente', cli: 'Subestación Norte', ant: '4.1 años', of: 2100000 },
+      { sr: 'MC-00018', tp: 'Macromedidor', cli: 'Parque Industrial', ant: '2.6 años', of: 5200000 }
+    ];
+
+    /* ---- Log de actividad demo (solo inserción) ---- */
+    let LOG = [
+      { f: '2026-05-29', h: '07:00', who: 'Sistema (n8n)', ac: 'Bloqueo preventivo', eq: 'TC-00077', ds: 'Calibración vence en 10 días · política de bloqueo a 10 días', k: 'block' },
+      { f: '2026-05-29', h: '07:00', who: 'Sistema (n8n)', ac: 'Alerta 7 días', eq: 'AN-00255', ds: 'Correo a Supply + alerta in-app', k: 'alert' },
+      { f: '2026-05-28', h: '08:00', who: 'Sistema (n8n)', ac: 'Alerta urgente OT', eq: 'MD-01456', ds: 'OT-20471, visita 06/06 · certificado vence 02/06', k: 'ot' },
+      { f: '2026-05-27', h: '16:20', who: 'Laura Gómez (Supply)', ac: 'Certificación registrada', eq: 'MD-01390', ds: 'Nueva conformidad hasta 18/06/2026', k: 'cert' },
+      { f: '2026-05-26', h: '09:10', who: 'Sistema (n8n)', ac: 'Alerta 15 días', eq: 'TC-00112', ds: 'Correo a Supply', k: 'alert' },
+      { f: '2026-05-22', h: '11:05', who: 'Carlos Ruiz (Supply)', ac: 'Enviado a laboratorio', eq: 'TC-00099', ds: 'METROBIT · calibración', k: 'lab' },
+      { f: '2026-05-20', h: '07:00', who: 'Sistema (n8n)', ac: 'Bloqueo por vencimiento', eq: 'TC-00087', ds: 'Sin renovación · ciclo retroactivo', k: 'block' },
+      { f: '2026-05-14', h: '15:40', who: 'Laura Gómez (Supply)', ac: 'Desbloqueo', eq: 'MD-01210', ds: 'Certificado renovado y verificado', k: 'unblock' },
+      { f: '2026-05-12', h: '10:30', who: 'Carlos Ruiz (Supply)', ac: 'Enviado a laboratorio', eq: 'MD-01340', ds: 'INPEL · calibración', k: 'lab' }
+    ];
+
+    /* ---- helpers de presentación ---- */
+    const EST = {
+      'Vigente': ['ch-ok', 'Vigente'], 'Alerta enviada': ['ch-alert', 'Alerta enviada'],
+      'En calibración': ['ch-cal', 'En calibración'], 'OT en riesgo': ['ch-ot', 'OT en riesgo'],
+      'Bloqueo preventivo': ['ch-block', 'Bloqueo prev.'], 'Vencido': ['ch-exp', 'Vencido']
+    };
+    const estChip = e => { const [c, l] = EST[e] || ['ch-ok', e]; return `<span class="cc-chip ${c}"><span class="dt"></span>${l}</span>`; };
+    const rKey = d => d < 0 ? 'exp' : d <= 20 ? '0-20' : d <= 30 ? '21-30' : '30+';
+    const rBadge = d => {
+      if (d < 0) return `<span class="cc-r r-exp">Vencido</span>`;
+      if (d <= 7) return `<span class="cc-r r-crit">${d} d</span>`;
+      if (d <= 20) return `<span class="cc-r r-20">${d} d</span>`;
+      if (d <= 30) return `<span class="cc-r r-30">${d} d</span>`;
+      return `<span class="cc-r r-ok">${d} d</span>`;
+    };
+    const dColor = d => d <= 7 ? '#fca5a5' : d <= 20 ? 'var(--warn)' : d <= 30 ? 'var(--info)' : 'var(--accent)';
+    const logDot = k => ({ block: 'var(--danger)', unblock: 'var(--accent)', alert: 'var(--warn)', ot: 'var(--purple)', cert: 'var(--info)', lab: 'var(--info)' }[k] || 'var(--t3)');
+
+    function ring(pct) {
+      const r = 26, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
+      return `<svg width="64" height="64" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--s3)" stroke-width="7"/>
+        <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
+          stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 32 32)"/></svg>`;
+    }
+
+    /* ===================== RESUMEN ===================== */
+    function ccResumen() {
+      const enRiesgo = E.filter(e => e._d >= 0 && e._d <= 30).length;
+      const crit = E.filter(e => e._d >= 0 && e._d <= 7).length;
+      const venc = E.filter(e => e._d < 0).length;
+      const lab = E.filter(e => e.lab).length;
+      const ot = E.filter(e => e.est === 'OT en riesgo').length;
+      const impacto = E.filter(e => e._d <= 30).reduce((s, e) => s + e.val, 0);
+      const kpis = [
+        ['En riesgo ≤30 días', enRiesgo, 'var(--warn)', 'requieren seguimiento'],
+        ['Críticos ≤7 días', crit, '#fca5a5', 'gestión inmediata'],
+        ['Vencidos', venc, 'var(--danger)', 'caso a evitar'],
+        ['OT en riesgo', ot, 'var(--purple)', 'con visita próxima'],
+        ['En laboratorio', lab, 'var(--info)', 'METROBIT / INPEL'],
+        ['Impacto proyectado', fComp(impacto), 'var(--accent)', 'valor en riesgo ≤30 d']
+      ];
+      document.getElementById('cc-kpis').innerHTML = kpis.map(([l, v, c, m]) => `<div class="cc-kpi">
+        <div class="strip" style="background:${c}"></div>
+        <div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div><div class="meta">${m}</div></div>`).join('');
+
+      document.getElementById('cc-heroring').innerHTML = ring(94) +
+        `<div><div class="big">94%</div><div class="rl">Tasa de gestión oportuna</div></div>`;
+
+      const cExp = venc, c020 = E.filter(e => e._d >= 0 && e._d <= 20).length,
+        c2130 = E.filter(e => e._d > 20 && e._d <= 30).length, c30 = E.filter(e => e._d > 30).length;
+      const segs = [['Vencido', cExp, '#f87171'], ['0–20', c020, '#fbbf24'], ['21–30', c2130, '#60a5fa'], ['30+', c30, '#4ade80']];
+      document.getElementById('cc-sem').innerHTML = segs.map(([l, n, c]) => n ? `<div class="seg" style="flex:${n};background:${c}" title="${l}: ${n}">${n}</div>` : '').join('');
+      document.getElementById('cc-semleg').innerHTML = segs.map(([l, n, c]) => `<span><i style="background:${c}"></i>${l} · ${n}</span>`).join('');
+
+      const urg = [...E].filter(e => e._d <= 20).sort((a, b) => a._d - b._d).slice(0, 6);
+      document.getElementById('cc-urg').innerHTML = urg.map(e => `<div class="cc-urgrow" onclick="ccSelect('${e.sr}',true)">
+        <span class="sr">${e.sr}</span><span class="tp">${e.tp}</span>${estChip(e.est)}
+        <span class="dd" style="color:${dColor(e._d)}">${e._d < 0 ? 'venc.' : e._d + ' d'}</span></div>`).join('');
+
+      const byc = {}; E.filter(e => e._d <= 30).forEach(e => byc[e.ct] = (byc[e.ct] || 0) + 1);
+      const arr = Object.entries(byc).sort((a, b) => b[1] - a[1]); const mx = Math.max(...arr.map(a => a[1]), 1);
+      document.getElementById('cc-bars').innerHTML = arr.map(([n, v]) => `<div class="cc-barrow">
+        <span class="nm">${n}</span><div class="cc-track"><div class="cc-fill" style="width:${v / mx * 100}%;background:var(--warn)"></div></div>
+        <span class="vv">${v}</span></div>`).join('');
+
+      const intercept = E.filter(e => ['Alerta enviada', 'Bloqueo preventivo', 'OT en riesgo', 'En calibración'].includes(e.est)).length;
+      document.getElementById('cc-prev').textContent = intercept;
+      document.getElementById('cc-slip').textContent = venc;
+    }
+
+    /* ===================== EQUIPOS ===================== */
+    function ccFillContratistas() {
+      const sel = document.getElementById('cc-fc');
+      [...new Set(E.map(e => e.ct))].sort().forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+    }
+    function ccGetFiltered() {
+      const q = document.getElementById('cc-q').value.toLowerCase();
+      const fc = document.getElementById('cc-fc').value, fr = document.getElementById('cc-fr').value;
+      return E.filter(e => {
+        if (fc && e.ct !== fc) return false;
+        if (fr && rKey(e._d) !== fr) return false;
+        if (q && !(`${e.sr} ${e.tp} ${e.ct} ${e.ub}`.toLowerCase().includes(q))) return false;
+        return true;
+      }).sort((a, b) => a._d - b._d);
+    }
+    function ccRenderTabla() {
+      const rows = ccGetFiltered();
+      document.getElementById('cc-cnt').textContent = `${rows.length} equipo${rows.length !== 1 ? 's' : ''}`;
+      if (!rows.length) { document.getElementById('cc-tabla').innerHTML = '<div class="empty"><h3>Sin resultados</h3><p>Ajusta los filtros</p></div>'; return; }
+      document.getElementById('cc-tabla').innerHTML = `<table><thead><tr>
+        <th>Serial</th><th>Tipo</th><th>Contratista</th><th>Próx. venc.</th><th>Días</th><th>Rango</th><th>Gestión</th><th>OT</th>
+      </tr></thead><tbody>${rows.map(e => `<tr style="cursor:pointer" onclick="ccSelect('${e.sr}',true)">
+        <td class="mc">${e.sr}</td><td class="nc">${e.tp}</td><td>${e.ct}</td>
+        <td style="font-family:var(--mono);font-size:11px">${fDate(e._n.date)} <span style="color:var(--t3)">(${e._n.tipo.slice(0, 4)}.)</span></td>
+        <td style="font-family:var(--mono);font-weight:700;color:${dColor(e._d)}">${e._d < 0 ? e._d : '+' + e._d}</td>
+        <td>${rBadge(e._d)}</td><td>${estChip(e.est)}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:${e.ot ? 'var(--purple)' : 'var(--t3)'}">${e.ot ? e.ot.id : '—'}</td>
+      </tr>`).join('')}</tbody></table>`;
+    }
+    function ccClear() { document.getElementById('cc-q').value = ''; document.getElementById('cc-fc').value = ''; document.getElementById('cc-fr').value = ''; ccRenderTabla(); }
+
+    /* ===================== GESTIÓN ===================== */
+    let ccSel = 'MD-01456';
+    function ccFillGsel() {
+      const sel = document.getElementById('cc-gsel');
+      [...E].sort((a, b) => a._d - b._d).forEach(e => { const o = document.createElement('option'); o.value = e.sr; o.textContent = `${e.sr} · ${e.tp}`; sel.appendChild(o); });
+      sel.value = ccSel;
+    }
+    function histFor(sr) {
+      const h = LOG.filter(l => l.eq === sr);
+      return h.length ? h : [{ f: '—', h: '', who: 'CertControl', ac: 'Sin movimientos registrados', eq: sr, ds: 'Este equipo aún no tiene historial de gestión.', k: '' }];
+    }
+    function ccRenderGestion() {
+      const e = E.find(x => x.sr === ccSel); if (!e) return;
+      const dC = daysTo(e.cal), dF = daysTo(e.conf);
+      const certRow = (lbl, date, d) => `<div class="cc-kv"><span class="k">${lbl}</span>
+        <span class="v">${fDate(date)} · <span style="color:${dColor(d)}">${d < 0 ? d + ' d (vencido)' : '+' + d + ' d'}</span> ${rBadge(d)}</span></div>`;
+      document.getElementById('cc-gest').innerHTML = `<div class="cc-det">
+        <div class="cc-card">
+          <div class="ct"><span class="d" style="background:var(--accent)"></span>Estado del equipo · ${e.sr}</div>
+          <div class="cc-kv"><span class="k">Tipo</span><span class="v">${e.tp}</span></div>
+          <div class="cc-kv"><span class="k">Contratista</span><span class="v">${e.ct}</span></div>
+          <div class="cc-kv"><span class="k">Ubicación</span><span class="v">${e.ub}</span></div>
+          <div class="cc-kv"><span class="k">Gestión actual</span><span class="v">${estChip(e.est)}</span></div>
+          ${certRow('Venc. Calibración', e.cal, dC)}
+          ${certRow('Venc. Conformidad', e.conf, dF)}
+          ${e.ot ? `<div class="cc-kv"><span class="k">OT asignada</span><span class="v" style="color:var(--purple)">${e.ot.id} · visita ${fDate(e.ot.vis)}</span></div>` : ''}
+          ${e.lab ? `<div class="cc-kv"><span class="k">En laboratorio</span><span class="v" style="color:var(--info)">${e.lab.prov} · desde ${fDate(e.lab.env)}</span></div>` : ''}
+          <div class="cc-actions">
+            <button class="cc-btn danger" onclick="ccAct('block')">Bloquear preventivamente</button>
+            <button class="cc-btn" onclick="ccAct('unblock')">Desbloquear</button>
+            <button class="cc-btn" onclick="ccAct('lab')">Enviar a laboratorio</button>
+          </div>
+          <div style="margin-top:10px"><span class="cc-conn">acciones · conectar a Voltio WMS + Supabase + n8n</span></div>
+
+          <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--b1)">
+            <div class="ct"><span class="d" style="background:var(--info)"></span>Registrar nueva certificación</div>
+            <div class="cc-fld"><label>Tipo de certificación</label>
+              <select id="cc-ctipo"><option>Calibración</option><option>Conformidad</option></select></div>
+            <div class="cc-fld"><label>Nueva fecha de vencimiento</label><input type="date" id="cc-cfecha"></div>
+            <button class="cc-btn go" onclick="ccRegCert()">Registrar certificación</button>
+            <div class="cc-help">Validación: solo se acepta fecha de vencimiento futura (criterio del PRD).</div>
+          </div>
+        </div>
+
+        <div class="cc-card">
+          <div class="ct"><span class="d" style="background:var(--purple)"></span>Historial del equipo</div>
+          <div class="cc-tl">${histFor(e.sr).map(l => `<div class="cc-tlrow">
+            <span class="dot" style="background:${logDot(l.k)}"></span>
+            <div class="hd"><span class="ac">${l.ac}</span><span class="tm">${l.f}${l.h ? ' ' + l.h : ''}</span></div>
+            <div class="ds">${l.who}${l.ds ? ' · ' + l.ds : ''}</div></div>`).join('')}</div>
+        </div>
+      </div>`;
+      const g = document.getElementById('cc-gsel'); if (g) g.value = ccSel;
+    }
+    function ccSelect(sr, jump) { ccSel = sr; ccRenderGestion(); if (jump) ccSec('gestion'); }
+
+    function ccAct(kind) {
+      const e = E.find(x => x.sr === ccSel);
+      const map = {
+        block: ['Bloqueo preventivo', 'Bloqueo simulado · pendiente de conectar a Voltio WMS / Supabase', 'block'],
+        unblock: ['Desbloqueo', 'Desbloqueo simulado · pendiente de conectar a Voltio WMS / Supabase', 'unblock'],
+        lab: ['Enviado a laboratorio', 'Envío simulado · pendiente de conectar a n8n', 'lab']
+      };
+      const [ac, msg, k] = map[kind];
+      LOG.unshift({ f: '2026-05-29', h: 'ahora', who: 'Tú (maqueta)', ac, eq: e.sr, ds: 'Acción de demostración', k });
+      toast('🔌 ' + msg, 's'); ccRenderGestion(); ccAudit();
+    }
+    function ccRegCert() {
+      const e = E.find(x => x.sr === ccSel);
+      const tipo = document.getElementById('cc-ctipo').value, fecha = document.getElementById('cc-cfecha').value;
+      if (!fecha) { toast('Selecciona una fecha de vencimiento', 'e'); return; }
+      if (daysTo(fecha) <= 0) { toast('La nueva certificación debe tener fecha futura', 'e'); return; }
+      LOG.unshift({ f: '2026-05-29', h: 'ahora', who: 'Tú (maqueta)', ac: 'Certificación registrada', eq: e.sr, ds: `${tipo} hasta ${fDate(fecha)}`, k: 'cert' });
+      toast('🔌 Certificación registrada (simulado) · conectar a Supabase', 's'); ccRenderGestion(); ccAudit();
+    }
+
+    /* ===================== LABORATORIO ===================== */
+    function ccLab() {
+      const labs = E.filter(e => e.lab);
+      const SLA = { METROBIT: 15, INPEL: 20 };
+      const enLab = labs.length, exceden = labs.filter(e => -daysTo(e.lab.env) > SLA[e.lab.prov]).length;
+      const promedio = Math.round(labs.reduce((s, e) => s + (-daysTo(e.lab.env)), 0) / (labs.length || 1));
+      const kpi = [['En laboratorio', enLab, 'var(--info)'], ['Exceden SLA', exceden, 'var(--danger)'], ['Días promedio', promedio, 'var(--warn)']];
+      document.getElementById('cc-labkpi').innerHTML = kpi.map(([l, v, c]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div></div>`).join('');
+      document.getElementById('cc-lablist').innerHTML = labs.map(e => {
+        const dias = -daysTo(e.lab.env), sla = SLA[e.lab.prov], over = dias - sla;
+        const col = e.lab.prov === 'METROBIT' ? 'var(--purple)' : 'var(--info)';
+        const ini = e.lab.prov === 'METROBIT' ? 'MB' : 'IN';
+        const estado = over > 0 ? `<span style="color:var(--danger)">Excede SLA · +${over} d</span>` : dias < 3 ? `<span style="color:var(--accent)">Recién enviado</span>` : `<span style="color:var(--warn)">En proceso · ${sla - dias} d restantes</span>`;
+        return `<div class="cc-labrow">
+          <div class="prov" style="background:${col}22;color:${col}">${ini}</div>
+          <div class="info"><div class="t">${e.sr} · ${e.tp}</div>
+            <div class="s">${e.lab.prov} · enviado ${fDate(e.lab.env)} · ${e.ct}</div></div>
+          <div class="sla"><div style="font-size:16px;font-weight:800;color:${over > 0 ? 'var(--danger)' : 'var(--t1)'}">${dias} d</div>${estado}</div>
+        </div>`;
+      }).join('');
+    }
+
+    /* ===================== IMPACTO $ ===================== */
+    function ccImpacto() {
+      const riesgo = E.filter(e => e._d <= 30);
+      const perdida = riesgo.reduce((s, e) => s + e.val, 0);
+      const renov = riesgo.length * 480000;
+      const intercept = E.filter(e => ['Alerta enviada', 'Bloqueo preventivo', 'OT en riesgo', 'En calibración'].includes(e.est)).length;
+      const ahorro = intercept * 1200000;
+      const kpi = [
+        ['Pérdida proyectada', fComp(perdida), 'var(--danger)', 'valor en riesgo ≤30 d'],
+        ['Costo de renovación', fComp(renov), 'var(--info)', 'estimado del ciclo'],
+        ['Ahorro preventivo', fComp(ahorro), 'var(--accent)', 'actividades protegidas'],
+        ['Interceptados / vencidos', intercept + ' / ' + E.filter(e => e._d < 0).length, 'var(--warn)', 'este ciclo']
+      ];
+      document.getElementById('cc-impkpi').innerHTML = kpi.map(([l, v, c, m]) => `<div class="cc-kpi"><div class="strip" style="background:${c}"></div><div class="lbl">${l}</div><div class="val" style="color:${c}">${v}</div><div class="meta">${m}</div></div>`).join('');
+      const byc = {}; riesgo.forEach(e => byc[e.ct] = (byc[e.ct] || 0) + e.val);
+      const arr = Object.entries(byc).sort((a, b) => b[1] - a[1]); const mx = Math.max(...arr.map(a => a[1]), 1);
+      document.getElementById('cc-impbars').innerHTML = arr.map(([n, v]) => `<div class="cc-barrow">
+        <span class="nm">${n}</span><div class="cc-track"><div class="cc-fill" style="width:${v / mx * 100}%;background:var(--danger)"></div></div>
+        <span class="vv">${fComp(v)}</span></div>`).join('');
+      document.getElementById('cc-venta').innerHTML = VENTA.map(v => `<div class="cc-kv" style="align-items:center">
+        <span class="k" style="color:var(--t1)"><b style="font-family:var(--mono)">${v.sr}</b> · ${v.tp}<br><span style="color:var(--t3);font-size:11px">${v.cli} · ${v.ant}</span></span>
+        <span class="v" style="text-align:right"><span style="color:var(--accent);font-size:14px">${fMoney(v.of)}</span><br>
+        <button class="cc-btn go" style="padding:5px 9px;margin-top:5px" onclick="toast('🔌 Propuesta de compra generada (simulado) · conectar a cotizador + firma digital','s')">Generar propuesta</button></span>
+      </div>`).join('') + `<div class="cc-help" style="margin-top:10px"><span class="cc-conn">conectar a cotizador inteligente + firma digital</span></div>`;
+    }
+
+    /* ===================== AUDITORÍA ===================== */
+    function ccAudit() {
+      document.getElementById('cc-log').innerHTML = LOG.slice(0, 12).map(l => `<div class="cc-tlrow">
+        <span class="dot" style="background:${logDot(l.k)}"></span>
+        <div class="hd"><span class="ac">${l.ac} · <span style="font-family:var(--mono);color:var(--t2)">${l.eq}</span></span><span class="tm">${l.f}${l.h ? ' ' + l.h : ''}</span></div>
+        <div class="ds">${l.who}${l.ds ? ' · ' + l.ds : ''}</div></div>`).join('');
+
+      const dashes = [
+        ['Historial de acciones', 'Bloqueos, desbloqueos, certificaciones y alertas con responsable y motivo.',
+          [['Bloqueos', LOG.filter(l => l.k === 'block').length], ['Desbloqueos', LOG.filter(l => l.k === 'unblock').length], ['Certificaciones', LOG.filter(l => l.k === 'cert').length], ['Alertas', LOG.filter(l => l.k === 'alert' || l.k === 'ot').length]]],
+        ['Vista por contratista', 'Calendario de vencimientos a 90 días con indicador de OT próxima.',
+          [['Energía Norte SAS', '4'], ['ElectriCosta', '4'], ['RedAndina', '4'], ['Voltaje Caribe', '3']]],
+        ['Mapa de urgencia', 'Equipos por urgencia y estado de gestión.',
+          [['Vencidos', E.filter(e => e._d < 0).length], ['Críticos ≤7 d', E.filter(e => e._d >= 0 && e._d <= 7).length], ['Gestionados', E.filter(e => e.est !== 'Vigente' && e.est !== 'Vencido').length]]],
+        ['Métricas de efectividad', 'Bloqueo oportuno, tiempo de renovación e interceptación.',
+          [['Bloqueo oportuno', '94%'], ['Tiempo renovación', '6.2 d'], ['Interceptados', '8 / 9']]]
+      ];
+      document.getElementById('cc-dash').innerHTML = dashes.map(([t, d, rows]) => `<div class="cc-dash">
+        <div class="dt">${t}</div><div class="dd">${d}</div>
+        <div class="mini">${rows.map(r => `<div class="cc-mini-row"><span>${r[0]}</span><span class="mv">${r[1]}</span></div>`).join('')}
+        <div style="margin-top:12px"><span class="cc-conn">abrir en Metabase</span></div></div></div>`).join('');
+    }
+
+    /* ===================== NAV / INIT ===================== */
+    function ccSec(name) {
+      document.querySelectorAll('.cc-sec').forEach(s => s.style.display = s.id === 'sec-' + name ? 'block' : 'none');
+      document.querySelectorAll('.cc-pillnav').forEach(p => p.classList.toggle('active', p.dataset.sec === name));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function toast(msg, type = 's') {
+      const t = document.getElementById('toast'), m = document.getElementById('tmsg');
+      m.textContent = msg; t.className = `toast show ${type}`;
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    ccResumen(); ccFillContratistas(); ccRenderTabla(); ccFillGsel(); ccRenderGestion(); ccLab(); ccImpacto(); ccAudit();
+  </script>
+</body>
+
+</html>
