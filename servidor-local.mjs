@@ -51,7 +51,7 @@ async function proxyMetabase(req, res) {
 }
 
 const server = createServer(async (req, res) => {
-  if (req.method === 'POST' && req.url === '/api/metabase') return proxyMetabase(req, res);
+  if (req.method === 'POST' && (req.url === '/api/vencidos' || req.url === '/api/metabase')) return proxyMetabase(req, res);
   let path = decodeURIComponent((req.url || '/').split('?')[0]);
   if (path === '/') path = '/certcontrol.html';
   const file = normalize(join(ROOT, path));

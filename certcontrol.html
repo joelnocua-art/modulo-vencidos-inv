@@ -5,24 +5,29 @@
 ═══════════════════════════════════════════════════════════════════════════════
 
   QUÉ ES
-    Página independiente (un solo archivo) que vigila el ciclo de vida de la
+    Página independiente que vigila el ciclo de vida de la
     certificación de los equipos: vencimientos, semáforo, alertas preventivas,
     SLA de laboratorio y candidatos a desasignación. Usa los MISMOS datos
     reales del inventario, sin tocar el resto del sistema.
 
-  CÓMO INTEGRARLO AL REPOSITORIO (1 paso obligatorio, 1 opcional)
-    1) Copia ESTE archivo (certcontrol.html) a la raíz del repo, junto a
-       index.html. Nada más se modifica.
-    2) (Opcional) Para que sea visible desde el menú, agrega UNA línea en el
-       <div class="nav"> de index.html:
+  CÓMO INTEGRARLO AL REPOSITORIO (2 archivos · nada existente se modifica)
+    1) Copia DOS archivos a tu repo (el que ya corre en Vercel):
+         · certcontrol.html  → a la raíz, junto a index.html
+         · api/vencidos.js    → dentro de la carpeta api/
+       No se toca index.html, ni api/metabase.js, ni ningún otro archivo.
+    2) Haz push. Vercel despliega api/vencidos.js como función y el módulo
+       carga el inventario EN VIVO solo. La API key se toma de la variable de
+       entorno de Vercel si existe (METABASE_API_KEY/MB_KEY/…), o del navegador
+       (bia_mb_key). No hay que configurar nada más.
+    3) (Opcional) Para verlo en el menú, agrega UNA línea en index.html:
            <a class="ntab" href="certcontrol.html">Vencidos</a>
        Es aditivo y reversible: no cambia goTab() ni ninguna pestaña existente.
 
-  ÚNICA DEPENDENCIA DE DATOS
-    mb-data.json (snapshot de Metabase, ya está en el repo). Cadena de respaldo:
+  DATOS
+    EN VIVO desde Metabase (card 18021) vía /api/vencidos. Si esa función no
+    está desplegada o no hay key, cae al snapshot incluido en el repo:
     mb-data.json → mb-data-mini.json → muestra real embebida (64 equipos).
-    Debe servirse por HTTP (GitHub Pages, Netlify o "python3 -m http.server").
-    SheetJS se carga desde CDN solo al subir un Excel; el CSV no requiere red.
+    Debe servirse por HTTP. SheetJS se carga desde CDN solo al subir un Excel.
 
   CAPA A — LISTO Y FUNCIONANDO (cliente, datos reales)
     #1 Alertas preventivas  · ventanas configurables 30/15/7, ruteo Bia/contratista
@@ -2684,11 +2689,10 @@
     async function ccLive() {
       const e = cur(); if (!e) return;
       const key = localStorage.getItem('bia_mb_key') || '';
-      if (!key) { toast('No hay API key. Configúrala en Inventario → Admin (se guarda en este dispositivo).', 'e'); return; }
       toast('Consultando Metabase…', 's');
       try {
-        const res = await fetch('/api/metabase', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serial: e.serial, apiKey: key }) });
-        if (!res.ok) { toast('Proxy /api/metabase no disponible (requiere despliegue en Vercel).', 'e'); return; }
+        const res = await fetch('/api/vencidos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serial: e.serial, apiKey: key }) });
+        if (!res.ok) { toast('Proxy /api/vencidos no disponible (requiere despliegue en Vercel).', 'e'); return; }
         const rows = await res.json(); const r = Array.isArray(rows) ? rows[0] : rows;
         if (!r) { toast('Metabase no devolvió datos para ese serial.', 'e'); return; }
         const merged = norm({
@@ -2921,26 +2925,25 @@
       };
     }
     async function ccLoad() {
-      // Datos EN VIVO de Metabase (card 18021) si hay API key configurada en
-      // Inventario → Admin (la misma clave que usa la app principal: bia_mb_key).
-      const mbKey = localStorage.getItem('bia_mb_key');
-      if (mbKey) {
-        try {
-          const res = await fetch('/api/metabase', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ serial: '*', apiKey: mbKey })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data) && data.length) {
-              ALL = data.map(mbRow).map(norm);
-              setSrc(`EN VIVO desde Metabase · ${data.length.toLocaleString()} equipos`, true);
-              renderAll(); return;
-            }
+      // Datos EN VIVO de Metabase (card 18021) vía /api/vencidos. La key puede
+      // venir del servidor (variable de entorno de Vercel) o del navegador
+      // (bia_mb_key). Si no hay endpoint o no hay key, cae al snapshot del repo.
+      try {
+        const mbKey = localStorage.getItem('bia_mb_key') || '';
+        const res = await fetch('/api/vencidos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serial: '*', apiKey: mbKey })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length) {
+            ALL = data.map(mbRow).map(norm);
+            setSrc(`EN VIVO desde Metabase · ${data.length.toLocaleString()} equipos`, true);
+            renderAll(); return;
           }
-        } catch (e) { /* continúa al fallback */ }
-      }
+        }
+      } catch (e) { /* continúa al fallback */ }
       // Fallback: intenta los snapshots JSON
       for (const url of ['mb-data.json', 'mb-data-mini.json']) {
         try {
