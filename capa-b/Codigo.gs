@@ -119,31 +119,35 @@ function esGestionable(e) {
 /* ============================ FUENTE DE DATOS =========================== */
 /**
  * Devuelve el inventario completo (array de objetos crudos).
- * Por defecto lee el snapshot mb-data.json. Para datos en vivo, reemplaza
- * el cuerpo por una consulta a una card de inventario completo de Metabase
- * (ver bloque comentado abajo).
+ * EN VIVO desde Metabase (card 18021) si la propiedad MB_KEY está configurada:
+ *   PropertiesService.getScriptProperties().setProperty('MB_KEY', 'tu-api-key')
+ * Sin MB_KEY usa el snapshot público mb-data.json (CONFIG.DATA_URL).
  */
 function obtenerInventario() {
-  const resp = UrlFetchApp.fetch(CONFIG.DATA_URL, { muteHttpExceptions: true });
-  if (resp.getResponseCode() !== 200) {
-    throw new Error('No se pudo leer DATA_URL (' + resp.getResponseCode() + '). Revisa la URL pública de mb-data.json.');
+  const MB_KEY = PropertiesService.getScriptProperties().getProperty('MB_KEY');
+  if (!MB_KEY) {
+    const resp = UrlFetchApp.fetch(CONFIG.DATA_URL, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) {
+      throw new Error('No hay MB_KEY y no se pudo leer DATA_URL (' + resp.getResponseCode() + '). Configura MB_KEY o la URL pública de mb-data.json.');
+    }
+    return JSON.parse(resp.getContentText());
   }
-  return JSON.parse(resp.getContentText());
 
-  /* ---- ALTERNATIVA EN VIVO (cuando tengas una card de inventario completo) ----
-  const CARD = 18021; // card de Metabase con TODO el inventario
+  const CARD = 18021; // "Inventario WMS" — inventario completo
   const r = UrlFetchApp.fetch('https://bia.metabaseapp.com/api/card/' + CARD + '/query/json', {
     method: 'post', contentType: 'application/json',
-    headers: { 'x-api-key': PropertiesService.getScriptProperties().getProperty('MB_KEY') },
+    headers: { 'x-api-key': MB_KEY },
     payload: JSON.stringify({}), muteHttpExceptions: true
   });
+  if (r.getResponseCode() !== 200) {
+    throw new Error('Error consultando Metabase card ' + CARD + ': ' + r.getResponseCode() + ' ' + r.getContentText());
+  }
   // Metabase devuelve nombres visibles ("Serial", "Tipo Sku", "Vencimiento Certificado Calibracion")
   return JSON.parse(r.getContentText()).map(row => ({
     serial: row['Serial'], sku: row['Sku'], tipo_sku: row['Tipo Sku'], estado: row['Estado'],
     marca: row['Marca'], ubicacion: row['Ubicacion'], bia_code: row['Bia Code'],
     venc_conf: row['Vencimiento Certificado Conformidad'], venc_calib: row['Vencimiento Certificado Calibracion']
   }));
-  ------------------------------------------------------------------------------ */
 }
 
 /* ============================ CÁLCULO DE ALERTAS ======================== */

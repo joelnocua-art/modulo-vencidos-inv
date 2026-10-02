@@ -1,4 +1,4 @@
-# CertControl · Capa B — Envío automático de alertas
+# Módulo de Vencidos · Capa B — Envío automático de alertas
 
 La **Capa A** (el módulo `certcontrol.html`) ya calcula y muestra todo con datos
 reales en el navegador. La **Capa B** es lo único que faltaba para que las
@@ -9,25 +9,32 @@ y guarda el registro en una **Google Sheet**. Usa exactamente la misma lógica
 que el módulo (parser de fechas en español, población gestionable, semáforo y
 ruteo Bia/contratista/lab), así que los números del correo coinciden con la web.
 
+**Datos EN VIVO:** se conecta directamente a Metabase (card 18021 "Inventario WMS")
+cada vez que corre. No depende de snapshots desactualizados.
+
 ```
-mb-data.json (snapshot)  ──►  Apps Script (cron 7 AM)  ──►  Gmail
-                                      │
-                                      └──►  Google Sheet (Log + Contactos, dedupe)
+Metabase (card 18021)  ──►  Apps Script (cron 7 AM)  ──►  Gmail
+  Inventario EN VIVO            │
+                                └──►  Google Sheet (Log + Contactos, dedupe)
 ```
 
 ---
 
 ## Instalación (≈10 min)
 
-1. **Crea una Google Sheet** nueva y nómbrala, p. ej., `CertControl Alertas`.
+1. **Crea una Google Sheet** nueva y nómbrala, p. ej., `Alertas Vencidos`.
    Será el registro de envíos (dedupe) y la libreta de contactos.
 
 2. En esa Sheet: **Extensiones → Apps Script**. Borra lo que haya y **pega el
    contenido de `Codigo.gs`**. Guarda (💾).
 
-3. **Edita el bloque `CONFIG`** al inicio del script:
-   - `DATA_URL`: la URL pública de tu `mb-data.json` ya desplegado, p. ej.
-     `https://TU-SITIO.netlify.app/mb-data.json`.
+3. **Configura la API key de Metabase** (para que lea datos EN VIVO):
+   - En el editor de Apps Script: **Proyecto → Configuración del proyecto**
+   - En **Propiedades** (parte izquierda): agrega una nueva propiedad
+     - Clave: `MB_KEY`
+     - Valor: tu API key de Metabase (puedes generarla en Metabase → Admin → Settings → Authentication → API keys)
+
+4. **Edita el bloque `CONFIG`** al inicio del script:
    - `SUPPLY_EMAIL`: el correo del equipo de Supply.
    - `VENTANAS`: deja `[30, 15, 7]` o ajústalas.
    - Deja `MODO_PRUEBA: true` por ahora (envía todo solo a ti para validar).
