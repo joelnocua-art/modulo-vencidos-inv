@@ -1,174 +1,247 @@
 /**
  * ============================================================================
- *  CertControl · CAPA B — Envío automático de alertas de vencimiento
- *  Google Apps Script (runtime V8) · sin Supabase · sin servidores propios
+ *  Módulo de Vencidos · CAPA B — Correo diario automático
+ *  Google Apps Script (runtime V8) · no necesita Supabase ni servidores
  * ============================================================================
  *
- *  QUÉ HACE
- *    Cada mañana (disparador horario) lee el inventario, calcula qué equipos
- *    entran en las ventanas de aviso (30/15/7 días), arma los correos y los
- *    envía con Gmail. Lleva un registro en la misma Google Sheet para NO
- *    repetir un aviso ya enviado (dedupe por serial + ventana).
+ *  QUÉ HACE (cada mañana, en días hábiles)
+ *    1. Lee el inventario EN VIVO de Metabase (card 18021).
+ *    2. Calcula lo mismo que la pestaña "Hoy" del módulo:
+ *       Bloquear · Desasignar · Enviar a laboratorio, más el backlog.
+ *    3. Envía a Supply un resumen con las 3 acciones (y un CSV con todas).
+ *    4. Avisa a cada contratista SOLO de sus equipos (hoja "Contactos"):
+ *         · certificado vencido    → "no instalar, devolver"  (una vez por equipo)
+ *         · vence en 30 / 15 / 7 d → aviso escalonado         (una vez por ventana)
+ *       La hoja "Log" registra lo enviado para no repetir avisos.
  *
- *  USA LA MISMA LÓGICA QUE EL MÓDULO (certcontrol.html):
- *    parseFecha (meses en español), población gestionable, semáforo y ruteo
- *    Bia / contratista / laboratorio. Así los números del correo coinciden
- *    exactamente con lo que se ve en la página.
+ *  Usa las mismas reglas que el módulo (src/lib/certificados.ts): fechas de
+ *  relleno ignoradas, accesorios por "Tipo Sku", fechas ISO como fecha local
+ *  y vencimiento = el certificado más próximo.
  *
- *  INSTALACIÓN: ver capa-b/README.md (8 pasos, ~10 minutos).
+ *  INSTALACIÓN: capa-b/README.md
  * ============================================================================
  */
 
 /* ============================ CONFIGURACIÓN ============================== */
 const CONFIG = {
-  // URL pública del snapshot del inventario (el mismo mb-data.json del repo).
-  // Ej. GitHub Pages: 'https://joelnocua-art.github.io/modulo-vencidos-inv/mb-data.json'
-  //     Netlify:      'https://TU-SITIO.netlify.app/mb-data.json'
-  DATA_URL: 'https://TU-SITIO/mb-data.json',
-
-  // Ventanas de aviso en días (escalonadas). Cada equipo se avisa una vez por ventana.
-  VENTANAS: [30, 15, 7],
-
-  // Correo del equipo de Supply: recibe los equipos de Bia y de laboratorio,
-  // y va en copia (CC) de los correos a contratistas.
+  // Recibe el resumen diario y va en copia de los avisos a contratistas. ← CÁMBIALO
   SUPPLY_EMAIL: 'supply@bia.app',
 
-  // A quién avisar
-  AVISAR_BIA: true,          // equipos en sedes Bia -> SUPPLY_EMAIL
-  AVISAR_CONTRATISTA: true,  // equipos en contratista -> correo del contratista (hoja "Contactos")
-  AVISAR_LAB: true,          // equipos en METROBIT/INPEL -> SUPPLY_EMAIL
+  // Link del módulo que aparece en los correos.
+  URL_MODULO: 'https://inventario-bia.lovable.app',
 
-  // No reenviar el mismo (serial + ventana) si ya se avisó. Pon 0 para no deduplicar.
-  DEDUPE: true,
+  // Mismos valores que ⚙ Alertas del módulo.
+  VENTANAS: [30, 15, 7],
+  VENTANA_DESASIGNACION: 30,
 
-  // Modo prueba: cuando es true, TODO se envía solo a TEST_EMAIL (no a los reales).
-  // Úsalo para validar antes de activar el disparador. Pon false para producción.
+  // false = solo se envía el resumen a Supply (no se escribe a contratistas).
+  AVISAR_CONTRATISTAS: true,
+
+  // true = TODO llega solo a TEST_EMAIL (con el destinatario real indicado en el
+  // correo) y nada cuenta como enviado en el Log. Pon false para producción.
   MODO_PRUEBA: true,
-  TEST_EMAIL: Session.getActiveUser().getEmail(),
+  TEST_EMAIL: Session.getEffectiveUser().getEmail(),
 
-  // Hora del disparador diario (0-23). Se usa al ejecutar instalarTrigger().
-  HORA_ENVIO: 7,
+  ZONA_HORARIA: 'America/Bogota',
+  HORA_ENVIO: 7,            // hora del disparador diario (0-23)
+  SOLO_DIAS_HABILES: true,  // no envía sábados ni domingos
 
-  // Nombre de la pestaña-registro dentro de la Sheet.
+  MAX_FILAS_CORREO: 20,     // filas por tabla en el correo (el CSV adjunto trae todas)
+
   HOJA_LOG: 'Log',
-  HOJA_CONTACTOS: 'Contactos' // columnas: Ubicación | Correo
+  HOJA_CONTACTOS: 'Contactos', // columnas: ubicacion | … | correos (separados por ;)
+
+  // Opcional: URL pública de un snapshot (mb-data.json) para cuando no hay MB_KEY.
+  DATA_URL: ''
 };
 
-/* ===================== LÓGICA COMPARTIDA CON EL MÓDULO =================== */
-const MES = { enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5, julio: 6, agosto: 7, septiembre: 8, setiembre: 8, octubre: 9, noviembre: 10, diciembre: 11 };
+/* ================ REGLAS (iguales a src/lib/certificados.ts) ================ */
+const ESTADOS = ['DISPONIBLE', 'ASIGNADO', 'PENDIENTE CERTIFICADOS'];
+const ACC_TIPO = /ANTENA|BLOQUE|ROUTER|MODEM|SIMCARD|CABLE/;
+const ACC_SKU = /ANTENA|BLOQUE|ROUTER|MODEM/;
+const MESES = {
+  enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5, julio: 6,
+  agosto: 7, septiembre: 8, setiembre: 8, octubre: 9, noviembre: 10, diciembre: 11,
+  ene: 0, feb: 1, mar: 2, abr: 3, may: 4, jun: 5, jul: 6, ago: 7, sep: 8, sept: 8,
+  oct: 9, nov: 10, dic: 11
+};
+const MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
-/** Parser de fechas robusto: ISO, "diciembre 10, 2028", "10 de mayo de 2026", dd/mm/yyyy. */
-function parseFecha(s) {
-  if (!s) return null;
-  s = String(s).trim();
-  // ISO como fecha LOCAL (new Date('2026-07-01') es UTC y en Colombia cae al día anterior)
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
-  m = s.toLowerCase().match(/([a-záéíóú]+)\s+(\d{1,2}),?\s+(\d{4})/);
-  if (m && MES[m[1]] !== undefined) return new Date(+m[3], MES[m[1]], +m[2]);
-  m = s.toLowerCase().match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/);
-  if (m && MES[m[2]] !== undefined) return new Date(+m[3], MES[m[2]], +m[1]);
-  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
-  const d = new Date(s); return isNaN(d) ? null : d;
+function limpiar(v) {
+  return v === null || v === undefined ? '' : String(v).replace(/\s+/g, ' ').trim();
 }
 
-// Fechas de relleno en Metabase: 1960-01-01 (sin dato) y 2070–2100 ("no vence")
-function fechaValida(d) { return !!d && d.getFullYear() >= 2000 && d.getFullYear() < 2060; }
-
-function diasA(s) {
-  const d = parseFecha(s); if (!fechaValida(d)) return null;
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0); d.setHours(0, 0, 0, 0);
-  return Math.round((d - hoy) / 86400000);
+function sinTildes(s) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-/** Accesorio sin certificación: usa "Tipo Sku" de Metabase si viene; si no, el SKU. */
-const ES_ACCESORIO = (sku, tipo) => tipo
-  ? /ANTENA|BLOQUE|ROUTER|MODEM|SIMCARD|CABLE/i.test(tipo)
-  : /ANTENA|BLOQUE|ROUTER|MODEM/i.test(sku || '');
-
-/** Segmenta la ubicación igual que el módulo. */
-function seg(u) {
-  u = u || '';
-  if (/^bia/i.test(u)) return 'Bia';
-  if (/METROBIT|INPEL/i.test(u)) return 'Lab';
-  if (u === 'INSTALADO' || !u) return 'Otro';
-  return 'Contratista';
+/** "Vencimiento Certificado Calibracion" → "vencimiento_certificado_calibracion". */
+function normalizarLlaves(r) {
+  const out = {};
+  Object.keys(r).forEach(k => { out[sinTildes(k.trim().toLowerCase()).replace(/\s+/g, '_')] = r[k]; });
+  return out;
 }
 
-/** Normaliza un registro crudo del inventario al modelo del módulo. */
-function norm(e) {
-  const dCal = diasA(e.venc_calib), dConf = diasA(e.venc_conf);
-  const cand = [];
-  if (dCal !== null) cand.push({ d: dCal, tipo: 'Calibración', date: e.venc_calib });
-  if (dConf !== null) cand.push({ d: dConf, tipo: 'Conformidad', date: e.venc_conf });
-  cand.sort((a, b) => a.d - b.d);
+function mk(y, m, d) {
+  const dt = new Date(y, m, d);
+  return isNaN(dt.getTime()) || dt.getMonth() !== m ? null : dt;
+}
+
+/** Fechas ISO, dd/mm/yyyy, "17 de febrero de 2028" o "febrero 17, 2028", como fecha LOCAL. */
+function parseFechaLocal(value) {
+  const raw = limpiar(value);
+  if (!raw || /^(null|n\/a|na|-|—)$/i.test(raw) || /^https?:\/\//i.test(raw)) return null;
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return mk(+iso[1], +iso[2] - 1, +iso[3]);
+  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (dmy) {
+    const y = +dmy[3] < 100 ? 2000 + +dmy[3] : +dmy[3];
+    return mk(y, +dmy[2] - 1, +dmy[1]);
+  }
+  const t = sinTildes(raw.toLowerCase()).replace(/,/g, ' ').replace(/\s+/g, ' ');
+  const dm = t.match(/^(\d{1,2}) (?:de )?([a-z]+)\.? (?:de )?(\d{4})/);
+  if (dm && MESES[dm[2]] !== undefined) return mk(+dm[3], MESES[dm[2]], +dm[1]);
+  const md = t.match(/^([a-z]+)\.? (\d{1,2}) (\d{4})/);
+  if (md && MESES[md[1]] !== undefined) return mk(+md[3], MESES[md[1]], +md[2]);
+  return null;
+}
+
+/** Hoy a las 00:00 en la zona horaria del módulo, como fecha local. */
+function hoy0() {
+  const p = Utilities.formatDate(new Date(), CONFIG.ZONA_HORARIA, 'yyyy-MM-dd').split('-');
+  return new Date(+p[0], +p[1] - 1, +p[2]);
+}
+
+function diasEntre(d, ref) {
+  const a = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const b = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  return Math.round((a.getTime() - b.getTime()) / 86400000);
+}
+
+/** Fecha de un certificado. Las de relleno (año < 2000 o ≥ 2060) se ignoran. */
+function leerFecha(raw, url, ref) {
+  const r = limpiar(raw);
+  const d = parseFechaLocal(r);
+  const relleno = !!d && (d.getFullYear() < 2000 || d.getFullYear() >= 2060);
+  const fecha = d && !relleno ? d : null;
+  const u = limpiar(url);
   return {
-    serial: String(e.serial || '').trim(), sku: e.sku, estado: String(e.estado || '').trim().toUpperCase(),
-    marca: String(e.marca || '').trim(), ubic: String(e.ubicacion || '').trim(), _acc: ES_ACCESORIO(e.sku, e.tipo_sku),
-    _n: cand[0] || null, _d: cand.length ? cand[0].d : null
+    fecha: fecha,
+    relleno: relleno,
+    url: /^https?:\/\//i.test(u) ? u.replace(/([^:])\/\/media/g, '$1/media') : '',
+    dias: fecha ? diasEntre(fecha, ref) : null
   };
 }
 
-/** ¿Pertenece a la población gestionable? (igual que la pestaña "Equipos Vencidos"). */
-function esGestionable(e) {
-  return ['DISPONIBLE', 'ASIGNADO', 'PENDIENTE CERTIFICADOS'].indexOf(e.estado) >= 0
-    && !e._acc && e._d !== null;
+function esAccesorio(tipoSku, sku) {
+  if (tipoSku) return ACC_TIPO.test(sinTildes(tipoSku.toUpperCase()));
+  return ACC_SKU.test(sinTildes(sku.toUpperCase()));
+}
+
+function tipoCortoDe(tipoSku, sku) {
+  const t = sinTildes(tipoSku.toLowerCase());
+  if (t.indexOf('corriente') >= 0) return 'TC';
+  if (t.indexOf('potencial') >= 0 || t.indexOf('tension') >= 0) return 'TP';
+  if (t.indexOf('medidor') >= 0) return 'Medidor';
+  const s = sku.toUpperCase();
+  if (/^TC\b/.test(s)) return 'TC';
+  if (/^TP\b/.test(s)) return 'TP';
+  return tipoSku || '—';
+}
+
+function pick(r, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    const v = r[keys[i]];
+    if (v !== null && v !== undefined && String(v).trim() !== '') return v;
+  }
+  return '';
+}
+
+function construirEquipo(row, ref) {
+  const r = normalizarLlaves(row);
+  const sku = limpiar(r.sku);
+  const tipoSku = limpiar(r.tipo_sku);
+  const estado = limpiar(r.estado).toUpperCase();
+  const ubicacion = limpiar(r.ubicacion);
+  const cal = leerFecha(pick(r, ['vencimiento_certificado_calibracion', 'venc_calibracion', 'venc_calib']), r.certificado_calibracion, ref);
+  const conf = leerFecha(pick(r, ['vencimiento_certificado_conformidad', 'venc_conformidad', 'venc_conf']), r.certificado_conformidad, ref);
+  let vence = null, define = null;
+  if (cal.fecha && (!conf.fecha || cal.fecha <= conf.fecha)) { vence = cal.fecha; define = 'Calibración'; }
+  else if (conf.fecha) { vence = conf.fecha; define = 'Conformidad'; }
+  const accesorio = esAccesorio(tipoSku, sku);
+  const U = ubicacion.toUpperCase();
+  return {
+    serial: limpiar(r.serial),
+    sku: sku,
+    tipoCorto: tipoCortoDe(tipoSku, sku),
+    estado: estado,
+    ubicacion: ubicacion,
+    biaCode: limpiar(pick(r, ['bia_code', 'codigo_bia'])),
+    cal: cal,
+    conf: conf,
+    vence: vence,
+    define: define,
+    dias: vence ? diasEntre(vence, ref) : null,
+    accesorio: accesorio,
+    certificable: ESTADOS.indexOf(estado) >= 0 && !accesorio && !!vence,
+    lab: U.indexOf('INPEL') >= 0 ? 'INPEL' : U.indexOf('METROBIT') >= 0 ? 'METROBIT' : null,
+    bodegaBia: /^bia\b/i.test(ubicacion)
+  };
+}
+
+const porDias = (a, b) => (a.dias === null ? 1e9 : a.dias) - (b.dias === null ? 1e9 : b.dias);
+
+/** Las mismas listas que la pestaña "Hoy" del módulo. */
+function analizar(rows, ref) {
+  const todos = rows.map(r => construirEquipo(r, ref));
+  const cert = todos.filter(e => e.certificable).sort(porDias);
+  const horizonte = Math.max.apply(null, CONFIG.VENTANAS);
+  const recert = cert.filter(e => e.estado === 'PENDIENTE CERTIFICADOS' && e.dias < 0);
+  return {
+    certificables: cert,
+    alDia: cert.filter(e => e.dias > 30).length,
+    bloquear: cert.filter(e => e.estado === 'DISPONIBLE' && e.dias < 0),
+    desasignar: cert.filter(e => e.estado === 'ASIGNADO' && e.dias <= CONFIG.VENTANA_DESASIGNACION),
+    enviarLab: cert.filter(e => e.estado === 'DISPONIBLE' && e.dias >= 0 && e.dias <= horizonte && !e.lab),
+    recert: recert,
+    recert6m: recert.filter(e => e.dias < -180).length,
+    vigentesEnPendiente: cert.filter(e => e.estado === 'PENDIENTE CERTIFICADOS' && e.dias > 30)
+  };
 }
 
 /* ============================ FUENTE DE DATOS =========================== */
 /**
- * Devuelve el inventario completo (array de objetos crudos).
- * EN VIVO desde Metabase (card 18021) si la propiedad MB_KEY está configurada:
- *   PropertiesService.getScriptProperties().setProperty('MB_KEY', 'tu-api-key')
- * Sin MB_KEY usa el snapshot público mb-data.json (CONFIG.DATA_URL).
+ * Inventario completo EN VIVO desde Metabase (card 18021).
+ * Requiere la propiedad del script MB_KEY (Configuración del proyecto › Propiedades del script).
  */
 function obtenerInventario() {
-  const MB_KEY = PropertiesService.getScriptProperties().getProperty('MB_KEY');
-  if (!MB_KEY) {
-    const resp = UrlFetchApp.fetch(CONFIG.DATA_URL, { muteHttpExceptions: true });
-    if (resp.getResponseCode() !== 200) {
-      throw new Error('No hay MB_KEY y no se pudo leer DATA_URL (' + resp.getResponseCode() + '). Configura MB_KEY o la URL pública de mb-data.json.');
+  const key = PropertiesService.getScriptProperties().getProperty('MB_KEY');
+  if (key) {
+    const r = UrlFetchApp.fetch('https://bia.metabaseapp.com/api/card/18021/query/json', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-api-key': key },
+      payload: JSON.stringify({ parameters: [], constraints: { 'max-results': 50000 }, ignore_cache: true }),
+      muteHttpExceptions: true
+    });
+    if (r.getResponseCode() !== 200) {
+      throw new Error('Metabase respondió ' + r.getResponseCode() + ': ' + r.getContentText().slice(0, 300));
     }
+    const data = JSON.parse(r.getContentText());
+    if (!Array.isArray(data)) throw new Error('Metabase no devolvió filas: ' + JSON.stringify(data).slice(0, 300));
+    return data;
+  }
+  if (CONFIG.DATA_URL) {
+    const resp = UrlFetchApp.fetch(CONFIG.DATA_URL, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) throw new Error('No se pudo leer DATA_URL (' + resp.getResponseCode() + ').');
     return JSON.parse(resp.getContentText());
   }
-
-  const CARD = 18021; // "Inventario WMS" — inventario completo
-  const r = UrlFetchApp.fetch('https://bia.metabaseapp.com/api/card/' + CARD + '/query/json', {
-    method: 'post', contentType: 'application/json',
-    headers: { 'x-api-key': MB_KEY },
-    payload: JSON.stringify({}), muteHttpExceptions: true
-  });
-  if (r.getResponseCode() !== 200) {
-    throw new Error('Error consultando Metabase card ' + CARD + ': ' + r.getResponseCode() + ' ' + r.getContentText());
-  }
-  // Metabase devuelve nombres visibles ("Serial", "Tipo Sku", "Vencimiento Certificado Calibracion")
-  return JSON.parse(r.getContentText()).map(row => ({
-    serial: row['Serial'], sku: row['Sku'], tipo_sku: row['Tipo Sku'], estado: row['Estado'],
-    marca: row['Marca'], ubicacion: row['Ubicacion'], bia_code: row['Bia Code'],
-    venc_conf: row['Vencimiento Certificado Conformidad'], venc_calib: row['Vencimiento Certificado Calibracion']
-  }));
+  throw new Error('Falta la API key de Metabase: agrega la propiedad MB_KEY en Configuración del proyecto › Propiedades del script.');
 }
 
-/* ============================ CÁLCULO DE ALERTAS ======================== */
-/**
- * Devuelve los equipos que entran en alerta hoy, agrupados por ventana.
- * Cada equipo cae en su ventana MÁS PEQUEÑA aplicable (exclusivo), igual
- * que el módulo. Los ya vencidos se excluyen del aviso preventivo.
- */
-function calcularAlertas() {
-  const inv = obtenerInventario().map(norm).filter(esGestionable);
-  const wins = CONFIG.VENTANAS.slice().sort((a, b) => a - b);
-  const buckets = {}; wins.forEach(w => buckets[w] = []);
-  inv.forEach(e => {
-    if (e._d < 0) return;                 // ya vencido: fuera de preventivo
-    const w = wins.find(w => e._d <= w);
-    if (w !== undefined) buckets[w].push(e);
-  });
-  return { wins: wins, buckets: buckets };
-}
+/* ======================= CONTACTOS Y REGISTRO (Sheet) ===================== */
+const ENCABEZADOS_LOG = ['Fecha', 'Serial', 'SKU', 'Ubicación', 'Aviso', 'Días', 'Destinatario', 'Estado'];
 
-/* ============================ DEDUPE (Sheet) ============================ */
 function getSheet_(nombre, encabezados) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(nombre);
@@ -179,156 +252,312 @@ function getSheet_(nombre, encabezados) {
   return sh;
 }
 
-/** Set de claves "serial||ventana" ya enviadas (para no repetir). */
-function clavesEnviadas_() {
-  const sh = getSheet_(CONFIG.HOJA_LOG, ['Fecha', 'Serial', 'SKU', 'Ubicación', 'Ventana', 'Días', 'Destinatario', 'Estado']);
-  const set = {};
-  const last = sh.getLastRow();
-  if (last < 2) return set;
-  const vals = sh.getRange(2, 2, last - 1, 4).getValues(); // Serial(B) .. Ventana(E)
-  vals.forEach(r => { set[r[0] + '||' + r[3]] = true; });
-  return set;
-}
+const claveUbic = u => sinTildes(limpiar(u).toUpperCase());
 
-function registrarEnvios_(filas) {
-  if (!filas.length) return;
-  const sh = getSheet_(CONFIG.HOJA_LOG, ['Fecha', 'Serial', 'SKU', 'Ubicación', 'Ventana', 'Días', 'Destinatario', 'Estado']);
-  sh.getRange(sh.getLastRow() + 1, 1, filas.length, 8).setValues(filas);
-}
-
-/** Mapa Ubicación -> Correo desde la pestaña "Contactos". */
+/** Ubicación → correos, desde la hoja "Contactos" (busca las columnas por su nombre). */
 function mapaContactos_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sh = ss.getSheetByName(CONFIG.HOJA_CONTACTOS);
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.HOJA_CONTACTOS);
   const mapa = {};
   if (!sh || sh.getLastRow() < 2) return mapa;
-  sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(r => {
-    if (r[0] && r[1]) mapa[String(r[0]).trim()] = String(r[1]).trim();
+  const datos = sh.getDataRange().getValues();
+  const enc = datos[0].map(h => sinTildes(String(h).toLowerCase()));
+  const cU = enc.findIndex(h => h.indexOf('ubicacion') >= 0);
+  const cC = enc.findIndex(h => h.indexOf('correo') >= 0);
+  if (cU < 0 || cC < 0) throw new Error('La hoja "' + CONFIG.HOJA_CONTACTOS + '" necesita las columnas "ubicacion" y "correos".');
+  datos.slice(1).forEach(f => {
+    const correos = String(f[cC] || '').split(/[;,\s]+/)
+      .map(s => s.trim()).filter(s => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
+    if (limpiar(f[cU]) && correos.length) mapa[claveUbic(f[cU])] = correos;
   });
   return mapa;
 }
 
-/* ============================ ENVÍO DE CORREOS ========================== */
-/**
- * Punto de entrada del disparador diario.
- * @param {boolean} dryRun  si true, no envía: solo devuelve el resumen.
- */
-function enviarAlertasDiarias(dryRun) {
-  const { wins, buckets } = calcularAlertas();
-  const yaEnviadas = CONFIG.DEDUPE ? clavesEnviadas_() : {};
-  const contactos = mapaContactos_();
-  const hoy = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-
-  // Agrupa por destinatario: { correo: { nombre, items: [{e, win}] } }
-  const porDest = {};
-  const nuevasFilas = [];
-  let totalElegibles = 0, totalNuevos = 0;
-
-  wins.forEach(w => {
-    buckets[w].forEach(e => {
-      totalElegibles++;
-      const sg = seg(e.ubic);
-      let correo = null, etiqueta = null;
-      if (sg === 'Bia' && CONFIG.AVISAR_BIA) { correo = CONFIG.SUPPLY_EMAIL; etiqueta = 'Supply (Bia)'; }
-      else if (sg === 'Lab' && CONFIG.AVISAR_LAB) { correo = CONFIG.SUPPLY_EMAIL; etiqueta = 'Supply (lab)'; }
-      else if (sg === 'Contratista' && CONFIG.AVISAR_CONTRATISTA) { correo = contactos[e.ubic] || CONFIG.SUPPLY_EMAIL; etiqueta = correo === CONFIG.SUPPLY_EMAIL ? 'Supply (falta correo contratista)' : e.ubic; }
-      if (!correo) return;
-
-      const clave = e.serial + '||' + w;
-      if (yaEnviadas[clave]) return;       // ya se avisó esta ventana
-      yaEnviadas[clave] = true;
-      totalNuevos++;
-
-      const destino = CONFIG.MODO_PRUEBA ? CONFIG.TEST_EMAIL : correo;
-      (porDest[destino] = porDest[destino] || { items: [] }).items.push({ e: e, w: w });
-      nuevasFilas.push([hoy, e.serial, e.sku, e.ubic, w, e._d, etiqueta + (CONFIG.MODO_PRUEBA ? ' [PRUEBA]' : ''), 'enviado']);
-    });
+/** Avisos ya enviados ("serial||aviso"). Las corridas de prueba no cuentan. */
+function clavesEnviadas_() {
+  const sh = getSheet_(CONFIG.HOJA_LOG, ENCABEZADOS_LOG);
+  const set = {};
+  if (sh.getLastRow() < 2) return set;
+  sh.getRange(2, 1, sh.getLastRow() - 1, 8).getValues().forEach(f => {
+    if (f[7] === 'enviado' && String(f[6]).indexOf('[PRUEBA]') < 0) set[f[1] + '||' + f[4]] = true;
   });
+  return set;
+}
 
-  if (dryRun) {
-    Logger.log('DRY RUN · elegibles=%s nuevos=%s destinatarios=%s', totalElegibles, totalNuevos, Object.keys(porDest).length);
-    return { elegibles: totalElegibles, nuevos: totalNuevos, destinatarios: Object.keys(porDest) };
+function registrarLog_(filas) {
+  if (!filas.length) return;
+  const sh = getSheet_(CONFIG.HOJA_LOG, ENCABEZADOS_LOG);
+  sh.getRange(sh.getLastRow() + 1, 1, filas.length, 8).setValues(filas);
+}
+
+/* ============================ AVISOS A CONTRATISTAS ====================== */
+/** 'vencido', o la ventana más pequeña que contiene al equipo ('7', '15', '30'). */
+function avisoDe(e) {
+  if (e.dias < 0) return 'vencido';
+  const w = CONFIG.VENTANAS.slice().sort((a, b) => a - b).filter(v => e.dias <= v)[0];
+  return w === undefined ? null : String(w);
+}
+
+/** Equipos (disponibles o asignados) en contratistas que hay que avisar hoy, por ubicación. */
+function avisosContratistas_(a, contactos, yaEnviados) {
+  const porUbic = {};
+  a.certificables.forEach(e => {
+    if (e.bodegaBia || e.lab || !e.ubicacion || e.ubicacion.toUpperCase() === 'INSTALADO') return;
+    if (e.estado !== 'DISPONIBLE' && e.estado !== 'ASIGNADO') return;
+    const aviso = avisoDe(e);
+    if (!aviso || yaEnviados[e.serial + '||' + aviso]) return;
+    const k = claveUbic(e.ubicacion);
+    if (!porUbic[k]) porUbic[k] = { ubicacion: e.ubicacion, correos: contactos[k] || [], items: [] };
+    porUbic[k].items.push({ e: e, aviso: aviso });
+  });
+  return Object.keys(porUbic).map(k => porUbic[k]).sort((x, y) => y.items.length - x.items.length);
+}
+
+/* ================================ ENVÍO ================================= */
+/**
+ * @param {{prueba: boolean, soloCalcular?: boolean}} op
+ *   prueba: todo llega a TEST_EMAIL y el Log marca "prueba" (no cuenta como enviado).
+ *   soloCalcular: no envía ni registra; devuelve el resumen.
+ */
+function ejecutar_(op) {
+  const ref = hoy0();
+  const a = analizar(obtenerInventario(), ref);
+  const grupos = CONFIG.AVISAR_CONTRATISTAS ? avisosContratistas_(a, mapaContactos_(), clavesEnviadas_()) : [];
+  const conCorreo = grupos.filter(g => g.correos.length);
+  const sinCorreo = grupos.filter(g => !g.correos.length);
+  const resumen = {
+    certificables: a.certificables.length,
+    bloquear: a.bloquear.length,
+    desasignar: a.desasignar.length,
+    enviarLab: a.enviarLab.length,
+    esperanRecertificacion: a.recert.length,
+    masDe6Meses: a.recert6m,
+    vigentesEnPendiente: a.vigentesEnPendiente.length,
+    contratistasAvisados: conCorreo.map(g => g.ubicacion + ' (' + g.items.length + ')'),
+    contratistasSinCorreo: sinCorreo.map(g => g.ubicacion + ' (' + g.items.length + ')')
+  };
+  if (op.soloCalcular) {
+    Logger.log(JSON.stringify(resumen, null, 2));
+    return resumen;
   }
 
-  // Envía un correo por destinatario
-  Object.keys(porDest).forEach(correo => {
-    const items = porDest[correo].items.sort((a, b) => a.e._d - b.e._d);
-    const html = construirCorreo_(items);
-    MailApp.sendEmail({
-      to: correo,
-      cc: (!CONFIG.MODO_PRUEBA && correo !== CONFIG.SUPPLY_EMAIL) ? CONFIG.SUPPLY_EMAIL : '',
-      subject: '⚠️ CertControl · ' + items.length + ' equipo(s) por vencer certificación',
-      htmlBody: html
-    });
+  const necesarios = conCorreo.length + 1;
+  if (MailApp.getRemainingDailyQuota() < necesarios) {
+    throw new Error('Cuota diaria de correo insuficiente: se necesitan ' + necesarios + ' envíos.');
+  }
+  const fecha = Utilities.formatDate(new Date(), CONFIG.ZONA_HORARIA, 'yyyy-MM-dd');
+  const filasLog = [];
+
+  conCorreo.forEach(g => {
+    g.items.sort((x, y) => x.e.dias - y.e.dias);
+    const msg = {
+      to: op.prueba ? CONFIG.TEST_EMAIL : g.correos.join(','),
+      replyTo: CONFIG.SUPPLY_EMAIL,
+      name: 'Bia · Vencimientos',
+      subject: (op.prueba ? '[PRUEBA] ' : '') + 'Bia · ' + g.items.length + ' equipo(s) con certificado vencido o por vencer · ' + g.ubicacion,
+      body: textoContratista_(g),
+      htmlBody: correoContratista_(g, op.prueba)
+    };
+    if (!op.prueba) msg.cc = CONFIG.SUPPLY_EMAIL;
+    MailApp.sendEmail(msg);
+    g.items.forEach(it => filasLog.push([fecha, it.e.serial, it.e.sku, g.ubicacion, it.aviso, it.e.dias,
+      g.correos.join(', '), op.prueba ? 'prueba' : 'enviado']));
   });
 
-  registrarEnvios_(nuevasFilas);
-  Logger.log('Enviados: %s correos · %s avisos nuevos', Object.keys(porDest).length, totalNuevos);
-  return { elegibles: totalElegibles, nuevos: totalNuevos, destinatarios: Object.keys(porDest) };
+  if (a.bloquear.length || a.desasignar.length || a.enviarLab.length || grupos.length) {
+    MailApp.sendEmail({
+      to: op.prueba ? CONFIG.TEST_EMAIL : CONFIG.SUPPLY_EMAIL,
+      name: 'Bia · Vencimientos',
+      subject: (op.prueba ? '[PRUEBA] ' : '') + 'Vencimientos · Bloquear ' + a.bloquear.length +
+        ' · Desasignar ' + a.desasignar.length + ' · Enviar a laboratorio ' + a.enviarLab.length,
+      body: textoSupply_(a),
+      htmlBody: correoSupply_(a, conCorreo, sinCorreo, op.prueba),
+      attachments: [csvAcciones_(a, fecha)]
+    });
+  }
+
+  registrarLog_(filasLog);
+  Logger.log(JSON.stringify(resumen, null, 2));
+  return resumen;
 }
 
-/** Cuerpo HTML del correo de alerta. */
-function construirCorreo_(items) {
-  const filas = items.map(it => {
-    const e = it.e, col = e._d <= 7 ? '#dc2626' : e._d <= 15 ? '#d97706' : '#2563eb';
-    return '<tr>' +
-      '<td style="padding:6px 10px;font-family:monospace">' + e.serial + '</td>' +
-      '<td style="padding:6px 10px">' + e.sku + '</td>' +
-      '<td style="padding:6px 10px">' + e.ubic + '</td>' +
-      '<td style="padding:6px 10px">' + (e._n ? e._n.tipo : '') + '</td>' +
-      '<td style="padding:6px 10px;text-align:center;font-weight:700;color:' + col + '">' + e._d + ' d</td>' +
-      '</tr>';
+/* ============================ CORREOS (HTML) ============================ */
+const C = { texto: '#1f2328', suave: '#57606a', linea: '#e5e7eb', fondo: '#f6f8fa', verde: '#1a7f37' };
+const BARRA = { bloquear: '#d03b3b', desasignar: '#ec835a', enviar: '#fab219' };
+
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+const nf = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const fFecha = d => d ? d.getDate() + ' ' + MES_CORTO[d.getMonth()] + ' ' + d.getFullYear() : '—';
+const fIso = d => d ? d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2) : '';
+
+function badgeDias(d) {
+  let bg = '#e7f6e7', fg = '#1e7a1e', txt = nf(d) + ' d';
+  if (d < 0) { bg = '#fde8e8'; fg = '#b42318'; txt = 'venció hace ' + nf(-d) + ' d'; }
+  else if (d <= 7) { bg = '#fdeee6'; fg = '#b54708'; }
+  else if (d <= 30) { bg = '#fef6dc'; fg = '#8a6100'; }
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:6px;background:' + bg + ';color:' + fg +
+    ';font-weight:600;font-size:12px;white-space:nowrap">' + txt + '</span>';
+}
+
+const TH = 'padding:8px 10px;text-align:left;font-weight:600;color:' + C.suave + ';font-size:12px;border-bottom:1px solid ' + C.linea;
+const TD = 'padding:8px 10px;border-bottom:1px solid ' + C.linea + ';font-size:13px;color:' + C.texto + ';vertical-align:top';
+
+function tablaEquipos_(lista, conBiaCode) {
+  const max = CONFIG.MAX_FILAS_CORREO;
+  const filas = lista.slice(0, max).map(e =>
+    '<tr><td style="' + TD + ';font-family:Menlo,Consolas,monospace">' + esc(e.serial) + '</td>' +
+    '<td style="' + TD + '">' + esc(e.tipoCorto) + '<div style="color:' + C.suave + ';font-size:12px">' + esc(e.sku) + '</div></td>' +
+    '<td style="' + TD + '">' + esc(e.ubicacion) + (conBiaCode && e.biaCode ? '<div style="color:' + C.suave + ';font-size:12px">' + esc(e.biaCode) + '</div>' : '') + '</td>' +
+    '<td style="' + TD + ';white-space:nowrap">' + fFecha(e.vence) + '<div style="color:' + C.suave + ';font-size:12px">' + esc(e.define) + '</div></td>' +
+    '<td style="' + TD + ';text-align:right">' + badgeDias(e.dias) + '</td></tr>').join('');
+  const mas = lista.length > max
+    ? '<p style="margin:8px 0 0;color:' + C.suave + ';font-size:12px">… y ' + nf(lista.length - max) + ' más en el CSV adjunto y en el módulo.</p>' : '';
+  return '<table role="presentation" style="border-collapse:collapse;width:100%;margin-top:10px">' +
+    '<tr><th style="' + TH + '">Serial</th><th style="' + TH + '">Equipo</th><th style="' + TH + '">Ubicación</th>' +
+    '<th style="' + TH + '">Vence</th><th style="' + TH + ';text-align:right">Días</th></tr>' + filas + '</table>' + mas;
+}
+
+function chip_(t) {
+  return '<span style="display:inline-block;margin:0 6px 6px 0;padding:3px 8px;border-radius:6px;background:' + C.fondo +
+    ';border:1px solid ' + C.linea + ';font-size:12px;color:' + C.suave + '">' + esc(t) + '</span>';
+}
+
+function bloqueAccion_(color, titulo, n, texto, chips, lista, conBiaCode) {
+  return '<div style="margin:16px 0;padding:16px 18px;border:1px solid ' + C.linea + ';border-left:4px solid ' + color + ';border-radius:10px">' +
+    '<div style="font-size:15px;font-weight:600;color:' + C.texto + '">' + esc(titulo) +
+    ' <span style="font-size:22px;margin-left:6px">' + nf(n) + '</span></div>' +
+    '<p style="margin:4px 0 10px;color:' + C.suave + ';font-size:13px">' + esc(texto) + '</p>' +
+    chips.map(chip_).join('') + (n ? tablaEquipos_(lista, conBiaCode) : '') + '</div>';
+}
+
+function contar_(lista, f) {
+  const m = {};
+  lista.forEach(e => { const k = f(e); if (k) m[k] = (m[k] || 0) + 1; });
+  return Object.keys(m).map(k => [k, m[k]]).sort((x, y) => y[1] - x[1]);
+}
+
+function envolver_(contenido, prueba, avisoPrueba) {
+  return '<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:760px;margin:0 auto;color:' + C.texto + '">' +
+    (prueba ? '<div style="margin-bottom:14px;padding:10px 12px;border-radius:8px;background:#fff8e1;border:1px solid #f5d77a;font-size:13px">' +
+      '<b>MODO PRUEBA</b> · ' + avisoPrueba + '</div>' : '') +
+    contenido + '</div>';
+}
+
+function correoSupply_(a, conCorreo, sinCorreo, prueba) {
+  const n = a.certificables.length;
+  const pct = n ? Math.round(a.alDia / n * 100) : 0;
+  const enContr = a.bloquear.filter(e => !e.bodegaBia).length;
+  const codes = contar_(a.desasignar, e => e.biaCode);
+  const vs = CONFIG.VENTANAS.slice().sort((x, y) => x - y);
+  const chipsEnvio = vs.map((v, i) => {
+    const desde = i ? vs[i - 1] + 1 : 0;
+    const k = a.enviarLab.filter(e => e.dias >= desde && e.dias <= v).length;
+    return (i ? desde + '–' + v + ' d' : '≤ ' + v + ' d') + ' · ' + k;
+  });
+  const tiposVig = contar_(a.vigentesEnPendiente, e => e.tipoCorto).map(t => t[0] + ' ' + t[1]).join(', ');
+  const hoy = new Date();
+  const contenido =
+    '<h2 style="margin:0;font-size:20px">Vencimientos de certificados · ' + fFecha(hoy0()) + '</h2>' +
+    '<p style="margin:4px 0 0;color:' + C.suave + ';font-size:13px">' + nf(n) + ' equipos certificables · <b style="color:' + C.verde + '">' + pct + '% al día</b> (vigentes a más de 30 días)</p>' +
+    bloqueAccion_(BARRA.bloquear, 'Bloquear', a.bloquear.length,
+      'Disponibles con certificado vencido. Pásalos a Pendiente certificados para que no se despachen.',
+      [enContr + ' en contratistas', (a.bloquear.length - enContr) + ' en bodegas Bia'], a.bloquear, false) +
+    bloqueAccion_(BARRA.desasignar, 'Desasignar', a.desasignar.length,
+      'Asignados que vencen en ≤ ' + CONFIG.VENTANA_DESASIGNACION + ' días. Afecta ' + codes.length + ' Bia Codes.',
+      codes.map(c => c[0] + ' · ' + c[1]), a.desasignar, true) +
+    bloqueAccion_(BARRA.enviar, 'Enviar a laboratorio', a.enviarLab.length,
+      'Disponibles que vencen en ≤ ' + vs[vs.length - 1] + ' días. Envíalos antes de que venzan.',
+      chipsEnvio, a.enviarLab, false) +
+    '<div style="margin:16px 0;padding:12px 16px;border-radius:10px;background:' + C.fondo + ';font-size:13px;line-height:1.6">' +
+    '⏳ <b>' + nf(a.recert.length) + ' equipos esperan recertificación</b> (pendiente certificados, ya vencidos) · ' + nf(a.recert6m) + ' llevan más de 6 meses.' +
+    (a.vigentesEnPendiente.length ? '<br>🔎 <b>' + nf(a.vigentesEnPendiente.length) + ' equipos en Pendiente certificados ya tienen certificado vigente</b> (' + esc(tiposVig) + '): revisar si pasan a Disponible.' : '') +
+    '</div>' +
+    (conCorreo.length || sinCorreo.length ?
+      '<div style="margin:16px 0;font-size:13px;line-height:1.6">' +
+      (conCorreo.length ? '<b>Avisos enviados hoy a contratistas:</b> ' + conCorreo.map(g => esc(g.ubicacion) + ' (' + g.items.length + ')').join(' · ') + '<br>' : '') +
+      (sinCorreo.length ? '<b style="color:#b54708">Sin correo en la hoja Contactos (no se les avisó):</b> ' + sinCorreo.map(g => esc(g.ubicacion) + ' (' + g.items.length + ')').join(' · ') : '') +
+      '</div>' : '') +
+    '<p style="margin:20px 0 0"><a href="' + esc(CONFIG.URL_MODULO) + '" style="display:inline-block;padding:9px 14px;border-radius:8px;background:' + C.verde + ';color:#fff;text-decoration:none;font-size:13px;font-weight:600">Abrir el módulo de Vencidos</a></p>' +
+    '<p style="margin:14px 0 0;color:#8c959f;font-size:11px">Datos en vivo de Metabase (card 18021) · generado ' +
+    Utilities.formatDate(hoy, CONFIG.ZONA_HORARIA, 'HH:mm') + ' · CSV adjunto con todas las acciones.</p>';
+  return envolver_(contenido, prueba, 'este resumen normalmente le llega a ' + esc(CONFIG.SUPPLY_EMAIL) + '.');
+}
+
+function correoContratista_(g, prueba) {
+  const filas = g.items.map(it => {
+    const e = it.e;
+    const accion = it.aviso === 'vencido'
+      ? '<b style="color:#b42318">No instalar.</b> Certificado vencido: coordinar con Bia su devolución.'
+      : 'Vence el ' + fFecha(e.vence) + '. Coordinar con Bia su devolución para recalibración.';
+    return '<tr><td style="' + TD + ';font-family:Menlo,Consolas,monospace">' + esc(e.serial) + '</td>' +
+      '<td style="' + TD + '">' + esc(e.tipoCorto) + '<div style="color:' + C.suave + ';font-size:12px">' + esc(e.sku) + '</div></td>' +
+      '<td style="' + TD + ';text-align:right">' + badgeDias(e.dias) + '</td>' +
+      '<td style="' + TD + '">' + accion + '</td></tr>';
   }).join('');
-  return '' +
-    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px">' +
-    '<h2 style="color:#0f766e;margin:0 0 4px">CertControl · Alerta de vencimientos</h2>' +
-    '<p style="color:#475569;margin:0 0 16px">Estos equipos necesitan renovar su certificación dentro de la ventana de aviso. Programa su envío a calibración.</p>' +
-    '<table style="border-collapse:collapse;width:100%;font-size:13px;border:1px solid #e2e8f0">' +
-    '<thead><tr style="background:#f1f5f9;text-align:left">' +
-    '<th style="padding:8px 10px">Serial</th><th style="padding:8px 10px">SKU</th>' +
-    '<th style="padding:8px 10px">Ubicación</th><th style="padding:8px 10px">Certificado</th>' +
-    '<th style="padding:8px 10px;text-align:center">Días</th></tr></thead>' +
-    '<tbody>' + filas + '</tbody></table>' +
-    '<p style="color:#94a3b8;font-size:11px;margin-top:16px">Enviado automáticamente por CertControl (Capa B · Apps Script). ' +
-    (CONFIG.MODO_PRUEBA ? '<b>MODO PRUEBA</b> — destinatarios reales desactivados.' : '') + '</p></div>';
+  const contenido =
+    '<h2 style="margin:0;font-size:18px">Hola, equipo de ' + esc(g.ubicacion) + ':</h2>' +
+    '<p style="margin:8px 0 0;font-size:14px;line-height:1.5">Estos equipos de Bia que están con ustedes necesitan atención por el vencimiento de su certificado:</p>' +
+    '<table role="presentation" style="border-collapse:collapse;width:100%;margin-top:12px">' +
+    '<tr><th style="' + TH + '">Serial</th><th style="' + TH + '">Equipo</th><th style="' + TH + ';text-align:right">Días</th><th style="' + TH + '">Qué hacer</th></tr>' +
+    filas + '</table>' +
+    '<p style="margin:16px 0 0;font-size:14px;line-height:1.5">Para coordinar la devolución, responde este correo (le llega a Supply: ' + esc(CONFIG.SUPPLY_EMAIL) + ').</p>' +
+    '<p style="margin:14px 0 0;color:#8c959f;font-size:11px">Aviso automático de Bia. No vuelve a llegar para el mismo equipo y el mismo plazo.</p>';
+  return envolver_(contenido, prueba, 'el destinatario real sería ' + esc(g.correos.join(', ')) + ' (con copia a Supply).');
 }
 
-/* ============================ UTILIDADES ================================ */
-/** Ejecuta una vez para validar: corre en MODO_PRUEBA y te manda el correo a ti. */
-function probar() {
-  const r = enviarAlertasDiarias(false);
-  Logger.log('Prueba completada: %s avisos a %s', r.nuevos, JSON.stringify(r.destinatarios));
+function textoSupply_(a) {
+  return 'Vencimientos de certificados · ' + fFecha(hoy0()) + '\n' +
+    'Bloquear: ' + a.bloquear.length + ' · Desasignar: ' + a.desasignar.length + ' · Enviar a laboratorio: ' + a.enviarLab.length + '\n' +
+    'Esperan recertificación: ' + a.recert.length + ' (' + a.recert6m + ' con más de 6 meses)\n' +
+    'Detalle en el CSV adjunto y en ' + CONFIG.URL_MODULO;
 }
 
-/** Solo calcula y registra en el Log, sin enviar (para revisar números). */
+function textoContratista_(g) {
+  return 'Hola, equipo de ' + g.ubicacion + ':\n\n' + g.items.map(it =>
+    '- ' + it.e.serial + ' (' + it.e.tipoCorto + '): ' + (it.aviso === 'vencido'
+      ? 'certificado vencido, no instalar.' : 'vence el ' + fFecha(it.e.vence) + '.')).join('\n') +
+    '\n\nPara coordinar la devolución, responde este correo (le llega a Supply).';
+}
+
+function csvAcciones_(a, fecha) {
+  const celda = v => { const s = v === null || v === undefined ? '' : String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const filas = [['accion', 'serial', 'tipo', 'sku', 'estado', 'ubicacion', 'bia_code', 'vence', 'certificado', 'dias']];
+  const add = (accion, lista) => lista.forEach(e => filas.push([accion, e.serial, e.tipoCorto, e.sku, e.estado, e.ubicacion, e.biaCode, fIso(e.vence), e.define, e.dias]));
+  add('Bloquear', a.bloquear);
+  add('Desasignar', a.desasignar);
+  add('Enviar a laboratorio', a.enviarLab);
+  add('Pendiente con certificado vigente', a.vigentesEnPendiente);
+  return Utilities.newBlob('﻿' + filas.map(f => f.map(celda).join(',')).join('\r\n'), 'text/csv', 'vencimientos-' + fecha + '.csv');
+}
+
+/* ======================= FUNCIONES PARA EJECUTAR ========================= */
+/** 1) Revisa los números sin enviar nada (ver › Registro de ejecución). */
 function previsualizar() {
-  const r = enviarAlertasDiarias(true);
-  Logger.log(JSON.stringify(r));
-  return r;
+  return ejecutar_({ prueba: true, soloCalcular: true });
 }
 
-/** Instala el disparador diario a la hora configurada. Ejecuta una sola vez. */
+/** 2) Envía TODO solo a ti (TEST_EMAIL) para revisar cómo llegan los correos. */
+function probar() {
+  return ejecutar_({ prueba: true });
+}
+
+/** 3) Instala el envío diario a la hora configurada. Ejecútalo una sola vez. */
 function instalarTrigger() {
   ScriptApp.getProjectTriggers().forEach(t => {
     if (t.getHandlerFunction() === 'tareaDiaria') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('tareaDiaria').timeBased().atHour(CONFIG.HORA_ENVIO).everyDays(1).create();
-  Logger.log('Disparador diario instalado a las %s:00.', CONFIG.HORA_ENVIO);
+  Logger.log('Envío diario instalado a las %s:00 (zona horaria del proyecto).', CONFIG.HORA_ENVIO);
 }
 
-/** La función que llama el disparador (envío real). */
+/** La llama el disparador. Mientras MODO_PRUEBA sea true, todo te llega solo a ti. */
 function tareaDiaria() {
-  enviarAlertasDiarias(false);
-}
-
-/* ===================== ENDPOINT WEB APP (opcional) =====================
- * Permite que el botón del módulo dispare un envío/preview bajo demanda.
- * Deploy > New deployment > Web app > Execute as: me > Access: Anyone.
- * Pega la URL resultante en el módulo (Config → URL de Apps Script).
- */
-function doPost(e) {
-  let accion = 'preview';
-  try { accion = (JSON.parse(e.postData.contents) || {}).accion || 'preview'; } catch (_) { }
-  const r = enviarAlertasDiarias(accion !== 'enviar');
-  return ContentService.createTextOutput(JSON.stringify(r)).setMimeType(ContentService.MimeType.JSON);
+  if (CONFIG.SOLO_DIAS_HABILES) {
+    const dia = Number(Utilities.formatDate(new Date(), CONFIG.ZONA_HORARIA, 'u')); // 1 = lunes … 7 = domingo
+    if (dia >= 6) return;
+  }
+  ejecutar_({ prueba: CONFIG.MODO_PRUEBA });
 }
