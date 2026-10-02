@@ -5,24 +5,29 @@
 ═══════════════════════════════════════════════════════════════════════════════
 
   QUÉ ES
-    Página independiente (un solo archivo) que vigila el ciclo de vida de la
+    Página independiente que vigila el ciclo de vida de la
     certificación de los equipos: vencimientos, semáforo, alertas preventivas,
     SLA de laboratorio y candidatos a desasignación. Usa los MISMOS datos
     reales del inventario, sin tocar el resto del sistema.
 
-  CÓMO INTEGRARLO AL REPOSITORIO (1 paso obligatorio, 1 opcional)
-    1) Copia ESTE archivo (certcontrol.html) a la raíz del repo, junto a
-       index.html. Nada más se modifica.
-    2) (Opcional) Para que sea visible desde el menú, agrega UNA línea en el
-       <div class="nav"> de index.html:
+  CÓMO INTEGRARLO AL REPOSITORIO (2 archivos · nada existente se modifica)
+    1) Copia DOS archivos a tu repo (el que ya corre en Vercel):
+         · certcontrol.html  → a la raíz, junto a index.html
+         · api/vencidos.js    → dentro de la carpeta api/
+       No se toca index.html, ni api/metabase.js, ni ningún otro archivo.
+    2) Haz push. Vercel despliega api/vencidos.js como función y el módulo
+       carga el inventario EN VIVO solo. La API key se toma de la variable de
+       entorno de Vercel si existe (METABASE_API_KEY/MB_KEY/…), o del navegador
+       (bia_mb_key). No hay que configurar nada más.
+    3) (Opcional) Para verlo en el menú, agrega UNA línea en index.html:
            <a class="ntab" href="certcontrol.html">Vencidos</a>
        Es aditivo y reversible: no cambia goTab() ni ninguna pestaña existente.
 
-  ÚNICA DEPENDENCIA DE DATOS
-    mb-data.json (snapshot de Metabase, ya está en el repo). Cadena de respaldo:
+  DATOS
+    EN VIVO desde Metabase (card 18021) vía /api/vencidos. Si esa función no
+    está desplegada o no hay key, cae al snapshot incluido en el repo:
     mb-data.json → mb-data-mini.json → muestra real embebida (64 equipos).
-    Debe servirse por HTTP (GitHub Pages, Netlify o "python3 -m http.server").
-    SheetJS se carga desde CDN solo al subir un Excel; el CSV no requiere red.
+    Debe servirse por HTTP. SheetJS se carga desde CDN solo al subir un Excel.
 
   CAPA A — LISTO Y FUNCIONANDO (cliente, datos reales)
     #1 Alertas preventivas  · ventanas configurables 30/15/7, ruteo Bia/contratista
@@ -2077,6 +2082,17 @@
 </head>
 
 <body>
+  <script>
+    /* Si el módulo se abre EMBEBIDO como pestaña del Inventario (dentro de un
+       iframe), oculta su propio header y su nav para no duplicar el chrome ni
+       navegar anidado. Abierto directamente (página completa) no cambia nada. */
+    if (window.self !== window.top) {
+      document.documentElement.classList.add('cc-embed');
+      var __ccEmbed = document.createElement('style');
+      __ccEmbed.textContent = '.cc-embed .nav{display:none!important}.cc-embed .hlogo,.cc-embed .uchip,.cc-embed .lout{display:none!important}.cc-embed .hdr{justify-content:flex-end;min-height:0;padding:10px 0}.cc-embed .main{padding-top:14px}';
+      document.head.appendChild(__ccEmbed);
+    }
+  </script>
   <div id="app-screen" style="display:block">
 
     <!-- ===== HEADER (mismo chrome del Inventario) ===== -->
@@ -2128,11 +2144,11 @@
       <!-- ===== AVISO DE ALCANCE ===== -->
       <div class="cc-int">
         <span class="ico">⚡</span>
-        <div><b>Datos reales</b> del inventario (snapshot de Metabase incluido en el repo). El semáforo, rangos y KPIs
-          se calculan con la fecha de hoy. El detalle de un equipo puede <b>refrescarse en vivo</b> desde Metabase si
-          hay API key configurada (Inventario → Admin). Lo que aún requiere la <b>Capa B</b> está marcado con
-          <span class="cc-conn">pendiente</span>: historial persistente, bloqueo automático y envío de alertas
-          (Apps Script + Google Sheet).</div>
+        <div><b>Datos reales</b> del inventario. Con la <b>API key configurada</b> (Inventario → Admin) el módulo
+          carga <b>EN VIVO</b> el inventario completo desde Metabase (card 18021) en cada apertura; sin ella usa el
+          snapshot incluido en el repo. El semáforo, rangos y KPIs se calculan con la fecha de hoy. Lo que aún requiere
+          la <b>Capa B</b> está marcado con <span class="cc-conn">pendiente</span>: historial persistente, bloqueo
+          automático y envío de alertas (Apps Script + Google Sheet).</div>
       </div>
 
       <!-- ===== SUB-NAV DEL MÓDULO ===== -->
@@ -2423,8 +2439,10 @@
     function parseFecha(s) {
       if (!s) return null;
       s = String(s).trim();
-      if (/^\d{4}-\d{2}-\d{2}/.test(s)) { const d = new Date(s); return isNaN(d) ? null : d; }
-      let m = s.toLowerCase().match(/([a-záéíóú]+)\s+(\d{1,2}),?\s+(\d{4})/);          // "mayo 14, 2027"
+      // ISO como fecha LOCAL: new Date('2026-07-01') es medianoche UTC y en Colombia (UTC-5) cae al día anterior
+      let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);                                       // "2026-07-01" / "2026-07-01T00:00:00Z"
+      if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+      m = s.toLowerCase().match(/([a-záéíóú]+)\s+(\d{1,2}),?\s+(\d{4})/);                // "mayo 14, 2027"
       if (m && MES[m[1]] !== undefined) return new Date(+m[3], MES[m[1]], +m[2]);
       m = s.toLowerCase().match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/);       // "14 de mayo de 2027"
       if (m && MES[m[2]] !== undefined) return new Date(+m[3], MES[m[2]], +m[1]);
@@ -2433,23 +2451,31 @@
       const d = new Date(s); return isNaN(d) ? null : d;
     }
     const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
-    function diasA(s) { const d = parseFecha(s); if (!d) return null; d.setHours(0, 0, 0, 0); return Math.round((d - TODAY) / 86400000); }
+    // Fechas de relleno que vienen en Metabase: 1960-01-01 (calibración sin dato) y 2070–2100 ("no vence")
+    const fechaValida = d => d && d.getFullYear() >= 2000 && d.getFullYear() < 2060;
+    function diasA(s) { const d = parseFecha(s); if (!fechaValida(d)) return null; d.setHours(0, 0, 0, 0); return Math.round((d - TODAY) / 86400000); }
     function fFecha(s) { const d = parseFecha(s); if (!d) return s || '—'; return d.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' }); }
 
     /* ---------- normalización al esquema real ---------- */
-    const ACC = /ANTENA|BLOQUE|ROUTER|MODEM/i;
+    const ACC = /ANTENA|BLOQUE|ROUTER|MODEM/i;                 // por SKU (cuando no llega el tipo)
+    const ACC_TIPO = /ANTENA|BLOQUE|ROUTER|MODEM|SIMCARD|CABLE/i; // por "Tipo Sku" de Metabase
     const GEST = ['DISPONIBLE', 'ASIGNADO', 'PENDIENTE CERTIFICADOS'];
+    const limpio = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+    const fechaRara = s => { const d = parseFecha(s); return !!d && !fechaValida(d); };
     function norm(e) {
       const dCal = diasA(e.venc_calib), dConf = diasA(e.venc_conf);
       const cand = [];
       if (dCal !== null) cand.push({ d: dCal, tipo: 'Calibración', date: e.venc_calib });
       if (dConf !== null) cand.push({ d: dConf, tipo: 'Conformidad', date: e.venc_conf });
       cand.sort((a, b) => a.d - b.d);
+      const sku = limpio(e.sku), tipo = limpio(e.tipo_sku);
       return {
-        serial: e.serial || '—', sku: e.sku || '—', estado: (e.estado || '').toUpperCase(),
-        marca: e.marca || '', ubic: e.ubicacion || '—', bia: e.bia_code || '',
+        serial: limpio(e.serial) || '—', sku: sku || '—', tipo, estado: limpio(e.estado).toUpperCase(),
+        marca: limpio(e.marca), ubic: limpio(e.ubicacion) || '—', bia: limpio(e.bia_code),
         cal: e.venc_calib, conf: e.venc_conf, dCal, dConf,
-        _n: cand[0] || null, _d: cand.length ? cand[0].d : null, _acc: ACC.test(e.sku || '')
+        _n: cand[0] || null, _d: cand.length ? cand[0].d : null,
+        _acc: tipo ? ACC_TIPO.test(tipo) : ACC.test(sku),
+        _rara: fechaRara(e.venc_calib) || fechaRara(e.venc_conf)
       };
     }
 
@@ -2491,9 +2517,10 @@
       const c830 = g.filter(e => e._d > 7 && e._d <= 30).length;
       const vig = g.filter(e => e._d > 30).length;
       const pct = g.length ? Math.round(vig / g.length * 100) : 0;
+      const vencPC = g.filter(e => e._d < 0 && e.estado === 'PENDIENTE CERTIFICADOS').length;
       const kpis = [
         ['Gestionables', g.length.toLocaleString(), 'var(--info)', 'con certificación'],
-        ['Vencidos', venc.toLocaleString(), '#fca5a5', 'requieren acción'],
+        ['Vencidos', venc.toLocaleString(), '#fca5a5', `${(venc - vencPC).toLocaleString()} en stock/campo · ${vencPC.toLocaleString()} ya en pend. cert.`],
         ['Críticos ≤7 días', c7.toLocaleString(), 'var(--danger)', 'gestión inmediata'],
         ['Por vencer 8–30', c830.toLocaleString(), 'var(--warn)', 'ventana de alerta'],
         ['Vigentes 30+', vig.toLocaleString(), 'var(--accent)', 'al día'],
@@ -2520,7 +2547,8 @@
         <div class="cc-money"><div class="big" style="color:#fca5a5">${venc}</div><div class="lbl">vencidos hoy</div></div>
         <div class="cc-money"><div class="big" style="color:var(--info)">${g.length.toLocaleString()}</div><div class="lbl">evaluados</div></div>
       </div>
-      <div>Población gestionable = <b style="color:var(--t1)">Disponible · Asignado · Pendiente certificados</b>, sin accesorios. El bloqueo automático y el envío de alertas escalonadas (30/15/7 días) son el siguiente paso. <span class="cc-conn">Capa B · Apps Script + Google Sheet</span></div>`;
+      <div>Población gestionable = <b style="color:var(--t1)">Disponible · Asignado · Pendiente certificados</b>, sin accesorios (antenas, módems, bloques, simcards).
+      ${(() => { const r = ALL.filter(e => e._rara).length; return r ? `<b style="color:var(--warn)">Calidad de datos:</b> ${r.toLocaleString()} equipos traen fechas de relleno en Metabase (1960 = sin dato · 2070+ = no vence); se ignoran para no inflar los vencidos.` : ''; })()} El bloqueo automático y el envío de alertas escalonadas (30/15/7 días) son el siguiente paso. <span class="cc-conn">Capa B · Apps Script + Google Sheet</span></div>`;
     }
 
     /* ===================== ACCIONES DE HOY ===================== */
@@ -2684,11 +2712,10 @@
     async function ccLive() {
       const e = cur(); if (!e) return;
       const key = localStorage.getItem('bia_mb_key') || '';
-      if (!key) { toast('No hay API key. Configúrala en Inventario → Admin (se guarda en este dispositivo).', 'e'); return; }
       toast('Consultando Metabase…', 's');
       try {
-        const res = await fetch('/api/metabase', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serial: e.serial, apiKey: key }) });
-        if (!res.ok) { toast('Proxy /api/metabase no disponible (requiere despliegue en Vercel).', 'e'); return; }
+        const res = await fetch('/api/vencidos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serial: e.serial, apiKey: key }) });
+        if (!res.ok) { toast('Proxy /api/vencidos no disponible (requiere despliegue en Vercel).', 'e'); return; }
         const rows = await res.json(); const r = Array.isArray(rows) ? rows[0] : rows;
         if (!r) { toast('Metabase no devolvió datos para ese serial.', 'e'); return; }
         const merged = norm({
@@ -2905,21 +2932,61 @@
     }
     function renderAll() { ccApplyCfg(); ccHoy(); ccResumen(); ccFillSelects(); ccRenderTabla(); ccRenderGestion(); ccRenderEmails(); ccAlertas(); ccDesasig(); ccLab(); ccAnalisis(); ccAudit(); }
 
+    // Mapea una fila cruda de Metabase (card 18021) a la forma que espera norm().
+    // Metabase exporta con nombres visibles ("Serial", "Bia Code", "Vencimiento
+    // Certificado Calibracion"), así que las llaves se normalizan antes de buscar.
+    const llave = k => String(k).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, '_');
+    function mbRow(raw) {
+      const r = {}; for (const k in raw) r[llave(k)] = raw[k];
+      const pick = (...ks) => { for (const k of ks) if (r[k] != null && r[k] !== '') return r[k]; return ''; };
+      return {
+        serial: pick('serial', 'serial_number', 'numero_serie', 'serie'),
+        sku: pick('sku', 'modelo', 'producto', 'descripcion'),
+        tipo_sku: pick('tipo_sku', 'tipo'),
+        estado: pick('estado', 'status'),
+        marca: pick('marca', 'brand', 'fabricante'),
+        ubicacion: pick('ubicacion', 'bodega', 'location'),
+        bia_code: pick('bia_code', 'codigo_bia', 'bia'),
+        venc_calib: pick('venc_calib', 'vencimiento_certificado_calibracion', 'vencimiento_calibracion'),
+        venc_conf: pick('venc_conf', 'vencimiento_certificado_conformidad', 'vencimiento_conformidad')
+      };
+    }
+    const SNAPSHOT_FECHA = '2026-10-02'; // fecha de exportación de mb-data.json (actualízala al regenerarlo)
     async function ccLoad() {
+      // Datos EN VIVO de Metabase (card 18021) vía /api/vencidos. La key puede
+      // venir del servidor (variable de entorno de Vercel) o del navegador
+      // (bia_mb_key). Si no hay endpoint o no hay key, cae al snapshot del repo.
+      try {
+        const mbKey = localStorage.getItem('bia_mb_key') || '';
+        const res = await fetch('/api/vencidos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serial: '*', apiKey: mbKey })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length) {
+            ALL = data.map(mbRow).map(norm);
+            setSrc(`EN VIVO desde Metabase · ${data.length.toLocaleString()} equipos`, true);
+            renderAll(); return;
+          }
+        }
+      } catch (e) { /* continúa al fallback */ }
+      // Fallback: intenta los snapshots JSON
       for (const url of ['mb-data.json', 'mb-data-mini.json']) {
         try {
           const res = await fetch(url, { cache: 'no-store' });
           if (!res.ok) continue;
           const arr = await res.json();
           if (Array.isArray(arr) && arr.length) {
-            ALL = arr.map(norm);
-            setSrc(`Datos reales · ${arr.length.toLocaleString()} equipos`, true);
+            ALL = arr.map(mbRow).map(norm);
+            setSrc(`Snapshot Metabase del ${fFecha(SNAPSHOT_FECHA)} · ${arr.length.toLocaleString()} equipos (no es en vivo)`, false);
             renderAll(); return;
           }
         } catch (e) { /* sigue al fallback */ }
       }
       ALL = CC_SAMPLE.map(norm);
-      setSrc(`Muestra real · ${CC_SAMPLE.length} equipos · sírvelo en web para los 10.189`, false);
+      setSrc(`Muestra real · ${CC_SAMPLE.length} equipos · sírvelo en web para el inventario completo`, false);
       renderAll();
     }
     ccLoad();

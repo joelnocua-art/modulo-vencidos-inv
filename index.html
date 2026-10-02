@@ -1288,6 +1288,7 @@
       <button class="ntab admin-only hidden" onclick="goTab('admin',this)">Admin</button>
       <button class="ntab admin-only hidden" onclick="goTab('inventarios',this)">Inventarios</button>
       <button class="ntab" onclick="goTab('about',this)">About</button>
+      <button class="ntab" onclick="goTab('vencidos',this)">Vencidos</button>
     </div>
 
     <div class="main">
@@ -1654,6 +1655,20 @@
         </div>
       </div>
 
+      <!-- ===== VENCIDOS · módulo aislado en iframe (no toca CSS/JS de los demás módulos) ===== -->
+      <div id="tab-vencidos" style="display:none;position:relative">
+        <div id="venc-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:2;border-radius:14px">
+          <div style="text-align:center;color:#64748b">
+            <div class="spin" style="margin:0 auto 12px"></div>
+            <p style="font-size:13px">Cargando módulo de vencidos…</p>
+          </div>
+        </div>
+        <iframe id="venc-iframe" src="certcontrol.html" title="Módulo de Vencidos"
+          style="width:100%;height:calc(100vh - 150px);min-height:560px;border:0;border-radius:14px;background:var(--bg);display:block"
+          onload="document.getElementById('venc-loading').style.display='none'"
+          onerror="document.getElementById('venc-loading').innerHTML='<p style=color:#f87171>No se pudo cargar certcontrol.html — verifica que el archivo esté en el repositorio.</p>'"></iframe>
+      </div>
+
     </div>
   </div>
   <!-- CHAT IA FLOTANTE -->
@@ -1800,7 +1815,7 @@
       document.getElementById('app-screen').style.flexDirection = 'column';
 
       // Siempre ocultar todos los tabs primero
-      ['conteo', 'pistoleo', 'admin', 'about'].forEach(t => {
+      ['conteo', 'pistoleo', 'admin', 'inventarios', 'about', 'vencidos'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (el) el.style.display = 'none';
       });
@@ -2432,7 +2447,7 @@
     // ─── TABS ───
     function goTab(tab, btn) {
       if ((tab === 'admin' || tab === 'inventarios') && CU?.role !== 'admin') { toast('No tienes permisos para acceder a esta sección', 'e'); return; }
-      ['conteo', 'pistoleo', 'admin', 'inventarios', 'about'].forEach(t => {
+      ['conteo', 'pistoleo', 'admin', 'inventarios', 'about', 'vencidos'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (el) el.style.display = t === tab ? 'block' : 'none';
       });
