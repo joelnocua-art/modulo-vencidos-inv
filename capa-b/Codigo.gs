@@ -61,8 +61,10 @@ const MES = { enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5, julio
 function parseFecha(s) {
   if (!s) return null;
   s = String(s).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) { const d = new Date(s); return isNaN(d) ? null : d; }
-  let m = s.toLowerCase().match(/([a-záéíóú]+)\s+(\d{1,2}),?\s+(\d{4})/);
+  // ISO como fecha LOCAL (new Date('2026-07-01') es UTC y en Colombia cae al día anterior)
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = s.toLowerCase().match(/([a-záéíóú]+)\s+(\d{1,2}),?\s+(\d{4})/);
   if (m && MES[m[1]] !== undefined) return new Date(+m[3], MES[m[1]], +m[2]);
   m = s.toLowerCase().match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/);
   if (m && MES[m[2]] !== undefined) return new Date(+m[3], MES[m[2]], +m[1]);
@@ -71,13 +73,19 @@ function parseFecha(s) {
   const d = new Date(s); return isNaN(d) ? null : d;
 }
 
+// Fechas de relleno en Metabase: 1960-01-01 (sin dato) y 2070–2100 ("no vence")
+function fechaValida(d) { return !!d && d.getFullYear() >= 2000 && d.getFullYear() < 2060; }
+
 function diasA(s) {
-  const d = parseFecha(s); if (!d) return null;
+  const d = parseFecha(s); if (!fechaValida(d)) return null;
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0); d.setHours(0, 0, 0, 0);
   return Math.round((d - hoy) / 86400000);
 }
 
-const ES_ACCESORIO = sku => /ANTENA|BLOQUE|ROUTER|MODEM/i.test(sku || '');
+/** Accesorio sin certificación: usa "Tipo Sku" de Metabase si viene; si no, el SKU. */
+const ES_ACCESORIO = (sku, tipo) => tipo
+  ? /ANTENA|BLOQUE|ROUTER|MODEM|SIMCARD|CABLE/i.test(tipo)
+  : /ANTENA|BLOQUE|ROUTER|MODEM/i.test(sku || '');
 
 /** Segmenta la ubicación igual que el módulo. */
 function seg(u) {
@@ -96,8 +104,8 @@ function norm(e) {
   if (dConf !== null) cand.push({ d: dConf, tipo: 'Conformidad', date: e.venc_conf });
   cand.sort((a, b) => a.d - b.d);
   return {
-    serial: e.serial, sku: e.sku, estado: e.estado, marca: e.marca,
-    ubic: e.ubicacion || '', _acc: ES_ACCESORIO(e.sku),
+    serial: String(e.serial || '').trim(), sku: e.sku, estado: String(e.estado || '').trim().toUpperCase(),
+    marca: String(e.marca || '').trim(), ubic: String(e.ubicacion || '').trim(), _acc: ES_ACCESORIO(e.sku, e.tipo_sku),
     _n: cand[0] || null, _d: cand.length ? cand[0].d : null
   };
 }
@@ -123,15 +131,17 @@ function obtenerInventario() {
   return JSON.parse(resp.getContentText());
 
   /* ---- ALTERNATIVA EN VIVO (cuando tengas una card de inventario completo) ----
-  const CARD = 99999; // <- ID de la card de Metabase que devuelve TODO el inventario
+  const CARD = 18021; // card de Metabase con TODO el inventario
   const r = UrlFetchApp.fetch('https://bia.metabaseapp.com/api/card/' + CARD + '/query/json', {
     method: 'post', contentType: 'application/json',
     headers: { 'x-api-key': PropertiesService.getScriptProperties().getProperty('MB_KEY') },
     payload: JSON.stringify({}), muteHttpExceptions: true
   });
+  // Metabase devuelve nombres visibles ("Serial", "Tipo Sku", "Vencimiento Certificado Calibracion")
   return JSON.parse(r.getContentText()).map(row => ({
-    serial: row.serial, sku: row.sku, estado: row.estado, marca: row.marca,
-    ubicacion: row.ubicacion, venc_conf: row.venc_conf, venc_calib: row.venc_calib
+    serial: row['Serial'], sku: row['Sku'], tipo_sku: row['Tipo Sku'], estado: row['Estado'],
+    marca: row['Marca'], ubicacion: row['Ubicacion'], bia_code: row['Bia Code'],
+    venc_conf: row['Vencimiento Certificado Conformidad'], venc_calib: row['Vencimiento Certificado Calibracion']
   }));
   ------------------------------------------------------------------------------ */
 }
