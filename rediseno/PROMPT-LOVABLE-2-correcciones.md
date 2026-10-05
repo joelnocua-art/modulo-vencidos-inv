@@ -13,6 +13,8 @@ Y crear estos archivos nuevos:
 
 NO toques `App.tsx`, las otras pestañas (Conteo, Pistolear, Buscar, Inventarios, Admin, About, Racks, Comparar), `supabase/functions/metabase-proxy`, `src/lib/supabase.ts`, `src/lib/auth.ts` ni ninguna tabla existente. Las otras pestañas deben verse y funcionar exactamente igual.
 
+**Estado de la base (ya hecho, no lo repitas):** el SQL del paso 2 YA se ejecutó en Supabase (proyecto ycbvwcjzgwfidyixtjrm). Existen `public.vencidos_config` (1 fila: ventanas {30,15,7}, desasignación 30, SLA METROBIT 15 e INPEL 20) y `public.vencidos_envios_lab`, con RLS: lectura para usuarios autenticados y escritura solo para admins, vía `public.has_role`. No ejecutes SQL ni pidas ejecutarlo; solo crea el archivo del paso 2 como registro.
+
 ---
 
 ## Paso 1 — El respaldo (snapshot) nunca se guarda
@@ -87,7 +89,7 @@ export async function leerSnapshot(): Promise<Snapshot | null> {
 **Problema:** `CCConfig` (`src/lib/vencidos.ts`) tiene `ventanas`, `ventanaDesasignacion`, `avisarBia`, `avisarContratistas`, `correos` y `appsScriptUrl`, pero solo `sla` se usa, y todo se guarda en localStorage (`cc_cfg`), así que cada navegador tiene su propia configuración.
 
 **Solución:**
-1. Crea `supabase/sql/2026-10-02-vencidos-modulo.sql` con este contenido exacto. Solo crea tablas NUEVAS del módulo. Si no puedes ejecutarlo, avísame que debo correrlo en Supabase › SQL Editor:
+1. Crea `supabase/sql/2026-10-02-vencidos-modulo.sql` con este contenido exacto, **solo como registro**: ya está ejecutado en Supabase, así que no lo ejecutes.
 ```sql
 -- ============================================================
 -- Módulo de Vencidos — configuración compartida y envíos a laboratorio
@@ -167,7 +169,7 @@ create policy "vencidos_envios borrar admin"
 ```
 2. Crea `src/lib/vencidos-config.ts` con:
    - El tipo `ConfigVencidos { ventanas: number[]; ventanaDesasignacion: number; slaMetrobit: number; slaInpel: number }`, con defaults `[30, 15, 7]`, `30`, `15` y `20`.
-   - `leerConfig()`: hace `select` a `vencidos_config` donde `id = 1`. Si la tabla no existe o hay error, devuelve los defaults y una bandera `remota: false`.
+   - `leerConfig()`: hace `select` a `vencidos_config` donde `id = 1`. Si la lectura falla (por ejemplo, sin conexión), devuelve los defaults y una bandera `remota: false`.
    - `guardarConfig(cfg)`: hace `update` donde `id = 1`, con `updated_at` = ahora y `updated_by` = id del usuario actual.
    - Valida que las ventanas sean 3 enteros entre 1 y 365, sin repetir, y guárdalas ordenadas de mayor a menor.
 3. En el encabezado del módulo, junto a "↻ Recargar", agrega el botón **"⚙ Alertas"**. Abre un panel lateral, con el mismo estilo del panel de Detalle, que contiene:
@@ -175,7 +177,7 @@ create policy "vencidos_envios borrar admin"
    - Ventana de desasignación (días).
    - SLA METROBIT (días) y SLA INPEL (días).
    - Botón Guardar, con toast de éxito o de error.
-   - Si `remota` es `false`, un aviso ámbar: "Configuración por defecto: falta ejecutar supabase/sql/2026-10-02-vencidos-modulo.sql en Supabase". En ese caso, deshabilita Guardar.
+   - Si `remota` es `false`, un aviso ámbar: "No se pudo leer la configuración compartida; se usan los valores por defecto". En ese caso, deshabilita Guardar.
 4. Quita los inputs de SLA de la tarjeta "En laboratorio externo". En su lugar muestra el texto "SLA METROBIT {n} d · INPEL {n} d" y un link "editar" que abre el panel ⚙ Alertas.
 5. **Usa la configuración en el cálculo.** En `src/lib/certificados.ts`, cambia la firma a:
 ```ts
@@ -200,7 +202,7 @@ export function analizar(
    - El semáforo (Vencido / ≤ 7 d / 8–30 d / Vigente) y `rangoDe()` NO cambian: son fijos.
 6. **Limpieza de `src/lib/vencidos.ts`.** Elimina `CCConfig`, `CFG_DEFAULT`, `loadCfg`/`saveCfg` y los campos sin uso (`avisarBia`, `avisarContratistas`, `correos`, `appsScriptUrl`); volverán con el correo diario. Elimina también el código duplicado que ya vive en `certificados.ts`: `parseFecha`, `normalizarEquipo`, `construirEquipos`, `RANGOS`, `segmentoDe`, `discoverDateColumns`, `SESSIONLOG` y `registrarAccion`. Antes de borrar, confirma con una búsqueda que ningún otro archivo los importa (hoy solo los importa `Vencidos.tsx`). Deja `parseCSV`. Al montar el módulo, ejecuta `localStorage.removeItem("cc_cfg")`.
 
-**Verificación:** en ⚙ Alertas, cambia la ventana de desasignación a 7 → la tarjeta Desasignar pasa de **8 a 5** (con el inventario del 2 oct). Vuelve a 30 → **8**. Entra con otro usuario admin → ve la misma configuración.
+**Verificación:** en ⚙ Alertas, cambia la ventana de desasignación a 7 → la tarjeta Desasignar pasa de **8 a 5** (si esos equipos no se han movido en el WMS). Vuelve a 30 → **8**. Entra con otro usuario admin → ve la misma configuración.
 
 ---
 
@@ -262,8 +264,8 @@ export function filasLaboratorio(
    - Rechaza las filas con proveedor o fecha inválidos, y muestra el toast "N cargadas · M rechazadas (proveedor o fecha inválida)".
    - Luego vuelve a leer la tabla.
 5. Agrega el botón **"Plantilla"**: descarga un CSV con el encabezado `serial,proveedor,fecha` y una fila por cada equipo que hoy está en laboratorio (con serial y proveedor ya llenos, y la fecha vacía).
-6. Migración automática: al abrir Laboratorio, si `localStorage["cc_envios"]` tiene filas y la tabla existe, súbelas una sola vez (con el mismo `upsert`), borra la clave y muestra el toast "Se pasaron N fechas de envío a la base de datos".
-7. Si la tabla no existe: muestra el aviso ámbar del paso 2, deshabilita la carga y NO vuelvas a usar localStorage. Elimina `loadEnvios`/`saveEnvios` y `ENVIOS_KEY` de `vencidos.ts`.
+6. Migración automática: al abrir Laboratorio, si `localStorage["cc_envios"]` tiene filas, súbelas una sola vez (con el mismo `upsert`), borra la clave y muestra el toast "Se pasaron N fechas de envío a la base de datos".
+7. Si la lectura de envíos falla: muestra el aviso ámbar "No se pudieron leer los envíos a laboratorio", deshabilita la carga y NO vuelvas a usar localStorage. Elimina `loadEnvios`/`saveEnvios` y `ENVIOS_KEY` de `vencidos.ts`.
 
 **Verificación:** carga un CSV con `859272,INPEL,{fecha de hace 31 días}` → en la fila 859272 aparece Enviado con esa fecha, "31 d" y "+11 d sobre SLA" (SLA INPEL 20). "Exceden SLA" queda en **1**. Otro usuario admin ve lo mismo.
 
@@ -343,9 +345,10 @@ describe("Configuración, laboratorio y consistencia", () => {
 ```
 (Agrega `filasLaboratorio` al `import` del archivo de pruebas.) Corre `npm test`: deben pasar las pruebas viejas y las nuevas.
 
-## Checklist final (inventario del 2 oct 2026; con datos en vivo los números pueden moverse un poco)
+## Checklist final
+Referencia: export de Metabase del 2 oct recalculado al 5 oct. Con datos en vivo los números se mueven cada día (equipos que vencen y cambios en el WMS).
 - [ ] Respaldo en IndexedDB funciona (verificación del paso 1).
-- [ ] ⚙ Alertas guarda en Supabase. Desasignar: 8 con 30 días, 5 con 7 días. Enviar a laboratorio: 113 (≤ 7 d · 55 · 8–15 d · 27 · 16–30 d · 31).
+- [ ] ⚙ Alertas guarda en Supabase. Desasignar: 8 con 30 días, 5 con 7 días. Enviar a laboratorio: 121 (≤ 7 d · 64 · 8–15 d · 29 · 16–30 d · 28).
 - [ ] Envíos por CSV quedan en la base y los ve cualquier admin; el SLA se calcula.
 - [ ] La pestaña Laboratorio muestra **876**; el subtítulo ya no dice 899; el KPI dice "Esperan recertificación 876 · de 899 en pendiente certificados · 23 con certificado vigente".
 - [ ] Calidad de datos lista "Pendiente certificados con certificado vigente: 23" y el chip sigue en **17**.
