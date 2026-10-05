@@ -11,6 +11,13 @@ Puedes usar los componentes de `src/components/ui` y `getSession()` de `@/lib/au
 
 ---
 
+## Paso 0 — Laboratorio: abrir el Detalle desde la tabla y anular
+Hoy "Anular envío" solo existe en el panel de Detalle (tarjeta `LabCard`), y la tabla de Laboratorio no abre ese panel.
+- Pasa `onSel={setSel}` a `TabLab`; hoy solo recibe `a`, `abrirAlertas` y `abrir`.
+- En la tabla "En laboratorio externo", cada fila abre el Detalle al hacer clic (cursor de mano y resaltado al pasar). Haz lo mismo con las filas de la vista previa del lote.
+- En la columna Acción, cuando la fila tiene envío, agrega junto a "Marcar recibido" el botón secundario **"Anular"**. Llama al mismo `anular(x.envio)` de `useLab()`, que ya pide confirmación.
+- Los botones dentro de una fila usan `e.stopPropagation()` para no abrir el Detalle.
+
 ## Paso 1 — Lógica pura en `src/lib/certificados.ts`
 Agrega al final del archivo este código exacto:
 ```ts
@@ -123,7 +130,7 @@ export function valorHace(
 ```
 
 ## Paso 2 — Marcas de "gestionado"
-- En el componente principal, lee `vencidos_gestion` completo (paginando), guárdalo en estado y crea `recargarMarcas()`.
+- En el componente principal, lee `vencidos_gestion` completo, paginando igual que `recargarEnvios`. Guárdalo en estado y crea `recargarMarcas()`. Comparte `marcas` y `recargarMarcas` agregándolos al contexto que ya existe (`LabCtx` / `useLab()`), así Hoy, Equipos y Detalle los leen sin pasar props.
 - Calcula estas tres listas y úsalas en todo el módulo:
   - `gBloquear = aplicarGestion(a.bloquear, "bloquear", marcas)`
   - `gDesasignar = aplicarGestion(a.desasignar, "desasignar", marcas)`
@@ -134,7 +141,7 @@ export function valorHace(
   - "N gestionados · esperando WMS": abre Equipos con ese filtro y los gestionados visibles.
   - "M sin efecto en el WMS (+7 d)", en ámbar.
   - Los chips actuales (contratistas, bodegas y Bia Codes) se calculan sobre `pendientes`.
-- **Pendientes con certificado vigente** (nota de Laboratorio y filtro "Vigentes en pendiente"): usa `gVigentes.pendientes` y agrega "· N ya revisados".
+- **Pendientes con certificado vigente** (nota de Laboratorio y filtro `vigpend`): usa `gVigentes.pendientes` y agrega "· N ya revisados".
 
 ## Paso 4 — Detalle: sección "Gestión"
 Aparece cuando el equipo está en Bloquear, Desasignar o Vigentes en pendiente.
@@ -143,18 +150,18 @@ Aparece cuando el equipo está en Bloquear, Desasignar o Vigentes en pendiente.
   - Desasignar: "Marcar: ya se desasignó".
   - Vigentes en pendiente: "Marcar como revisado".
 
-  Debajo va un campo de nota opcional. Al guardar, inserta `{ serial, accion, vence_ref: isoDia(e.vence), nota, gestionado_por_nombre: getSession()?.nombre }`, luego `recargarMarcas()` y un toast.
+  Debajo va un campo de nota opcional. Al guardar, inserta `{ serial, accion, vence_ref: isoDia(e.vence), nota, gestionado_por_nombre }`, luego `recargarMarcas()` y un toast. El nombre sale de `getSession()?.nombre` de `@/lib/auth`; impórtalo con otro nombre, por ejemplo `getAppSession`, para no confundirlo con `supabase.auth.getSession()`.
 - **Gestionado:** "✓ Gestionado por {nombre} hace N d", con la nota y el botón "Deshacer", que borra la marca por `id`.
 - **Sin efecto:** en ámbar, "Marcado hace N d, pero el WMS sigue igual", y el botón "Marcar de nuevo".
 
 ## Paso 5 — Equipos: gestionar en bloque
-- Con los filtros Bloquear, Desasignar o Vigentes en pendiente, la tabla muestra por defecto los `pendientes`. Agrega el interruptor "Mostrar gestionados (N)".
-- En la barra de selección, agrega "Marcar como gestionado (N)" para esos tres filtros, con una nota opcional. Inserta una marca por equipo.
+- Con los filtros `bloquear`, `desasignar` o `vigpend`, la tabla muestra por defecto los `pendientes`. Agrega el interruptor "Mostrar gestionados (N)".
+- En la barra de selección (la de `selec`), agrega "Marcar como gestionado (N)" para esos tres filtros, con una nota opcional. Inserta una marca por equipo y limpia la selección.
 
 ## Paso 6 — Historial diario
 - Después de una carga EN VIVO exitosa (nunca desde el respaldo) y con los envíos ya leídos:
   - Calcula `filaHistorial(a, filasLaboratorio(a.todos, envios, sla))`.
-  - Haz `upsert` en `vencidos_historial` con `onConflict: "fecha"`, más `actualizado_en` (ahora) y `actualizado_por` (id del usuario).
+  - Haz `upsert` en `vencidos_historial` con `onConflict: "fecha"`, más `actualizado_en` (ahora) y `actualizado_por`. El id del usuario se obtiene con `supabase.auth.getUser()`, como en "Marcar recibido".
   - Hazlo una vez por carga. Si falla, `console.warn` y sin toast.
   - La foto guarda los números del WMS, antes de descontar gestionados o envíos.
 - Lee los últimos 180 días de `vencidos_historial`, ordenados por fecha.
@@ -217,9 +224,10 @@ describe("Gestión e historial", () => {
   });
 });
 ```
-Corre `npm test`: deben pasar todas, las anteriores y estas 5.
+Corre `npm test`: deben pasar las 16 (las 11 actuales y estas 5).
 
 ## Checklist
+- [ ] En Laboratorio, clic en una fila abre el Detalle; el botón "Anular" de la tabla borra el envío (con confirmación) y el equipo vuelve a su lista.
 - [ ] Marca un equipo de Bloquear como gestionado: el número baja en 1 y aparece "1 gestionados · esperando WMS". Otro admin lo ve. "Deshacer" lo devuelve.
 - [ ] Marca 1 de los vigentes en pendiente como revisado: la nota pasa a "22 … · 1 ya revisados" (con los datos del 5 oct).
 - [ ] Al abrir el módulo con datos en vivo, la tabla `vencidos_historial` en Supabase muestra la fila de hoy, además de la línea base del 2 oct.
