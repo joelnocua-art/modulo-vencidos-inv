@@ -13,6 +13,10 @@
  *         · certificado vencido    → "no instalar, devolver"  (una vez por equipo)
  *         · vence en 30 / 15 / 7 d → aviso escalonado         (una vez por ventana)
  *       La hoja "Log" registra lo enviado para no repetir avisos.
+ *    5. (Opcional) Se conecta al módulo en Supabase con un usuario de solo lectura:
+ *       usa la configuración de ⚙ Alertas y descuenta los envíos registrados y
+ *       los equipos marcados como gestionados, para decir lo mismo que la pantalla.
+ *    6. (Opcional) Los lunes envía al equipo del WMS el reporte de calidad de datos.
  *
  *  Usa las mismas reglas que el módulo (src/lib/certificados.ts): fechas de
  *  relleno ignoradas, accesorios por "Tipo Sku", fechas ISO como fecha local
@@ -47,6 +51,10 @@ const CONFIG = {
   SOLO_DIAS_HABILES: true,  // no envía sábados ni domingos
 
   MAX_FILAS_CORREO: 20,     // filas por tabla en el correo (el CSV adjunto trae todas)
+
+  // Reporte semanal de calidad de datos para el equipo del WMS ('' = no se envía).
+  WMS_EMAIL: '',
+  DIA_REPORTE_WMS: 1,       // 1 = lunes … 5 = viernes
 
   HOJA_LOG: 'Log',
   HOJA_CONTACTOS: 'Contactos', // columnas: ubicacion | … | correos (separados por ;)
@@ -128,6 +136,7 @@ function leerFecha(raw, url, ref) {
   return {
     fecha: fecha,
     relleno: relleno,
+    anio: d ? d.getFullYear() : null,
     url: /^https?:\/\//i.test(u) ? u.replace(/([^:])\/\/media/g, '$1/media') : '',
     dias: fecha ? diasEntre(fecha, ref) : null
   };
@@ -172,6 +181,7 @@ function construirEquipo(row, ref) {
   const U = ubicacion.toUpperCase();
   return {
     serial: limpiar(r.serial),
+    serialRaw: r.serial === null || r.serial === undefined ? '' : String(r.serial),
     sku: sku,
     tipoCorto: tipoCortoDe(tipoSku, sku),
     estado: estado,
@@ -183,6 +193,7 @@ function construirEquipo(row, ref) {
     define: define,
     dias: vence ? diasEntre(vence, ref) : null,
     accesorio: accesorio,
+    candidato: ESTADOS.indexOf(estado) >= 0 && !accesorio,
     certificable: ESTADOS.indexOf(estado) >= 0 && !accesorio && !!vence,
     lab: U.indexOf('INPEL') >= 0 ? 'INPEL' : U.indexOf('METROBIT') >= 0 ? 'METROBIT' : null,
     bodegaBia: /^bia\b/i.test(ubicacion)
@@ -198,6 +209,7 @@ function analizar(rows, ref) {
   const horizonte = Math.max.apply(null, CONFIG.VENTANAS);
   const recert = cert.filter(e => e.estado === 'PENDIENTE CERTIFICADOS' && e.dias < 0);
   return {
+    todos: todos,
     certificables: cert,
     alDia: cert.filter(e => e.dias > 30).length,
     bloquear: cert.filter(e => e.estado === 'DISPONIBLE' && e.dias < 0),
@@ -289,6 +301,109 @@ function registrarLog_(filas) {
   sh.getRange(sh.getLastRow() + 1, 1, filas.length, 8).setValues(filas);
 }
 
+/* ================= CONEXIÓN CON EL MÓDULO (Supabase, opcional) ============= */
+/**
+ * Lee la configuración de ⚙ Alertas, los envíos a laboratorio y las marcas de
+ * "gestionado" entrando con un usuario de la app (solo lectura por RLS).
+ * Propiedades del script: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_USUARIO, SUPABASE_CLAVE.
+ * Devuelve null si no está configurado o si falla (el correo sale igual, con los datos del WMS).
+ */
+function datosModulo_() {
+  const p = PropertiesService.getScriptProperties();
+  const url = (p.getProperty('SUPABASE_URL') || '').replace(/\/+$/, '');
+  const anon = p.getProperty('SUPABASE_ANON_KEY');
+  const usuario = p.getProperty('SUPABASE_USUARIO');
+  const clave = p.getProperty('SUPABASE_CLAVE');
+  if (!url || !anon || !usuario || !clave) return null;
+  try {
+    const login = UrlFetchApp.fetch(url + '/auth/v1/token?grant_type=password', {
+      method: 'post', contentType: 'application/json', headers: { apikey: anon },
+      payload: JSON.stringify({ email: usuario, password: clave }), muteHttpExceptions: true
+    });
+    if (login.getResponseCode() !== 200) throw new Error('login ' + login.getResponseCode() + ': ' + login.getContentText().slice(0, 200));
+    const token = JSON.parse(login.getContentText()).access_token;
+    const leer = ruta => {
+      // Supabase devuelve como máximo 1000 filas por consulta: se pagina.
+      let out = [];
+      for (let desde = 0; ; desde += 1000) {
+        const r = UrlFetchApp.fetch(url + '/rest/v1/' + ruta + '&limit=1000&offset=' + desde, {
+          headers: { apikey: anon, Authorization: 'Bearer ' + token }, muteHttpExceptions: true
+        });
+        if (r.getResponseCode() !== 200) throw new Error(ruta.split('?')[0] + ' ' + r.getResponseCode() + ': ' + r.getContentText().slice(0, 200));
+        const pagina = JSON.parse(r.getContentText());
+        out = out.concat(pagina);
+        if (pagina.length < 1000) return out;
+      }
+    };
+    return {
+      config: leer('vencidos_config?select=ventanas,ventana_desasignacion&id=eq.1')[0] || null,
+      envios: leer('vencidos_envios_lab?select=serial,proveedor,fecha_envio,fecha_retorno&order=fecha_envio.desc'),
+      marcas: leer('vencidos_gestion?select=serial,accion,vence_ref,gestionado_en&order=gestionado_en.desc')
+    };
+  } catch (e) {
+    Logger.log('Sin conexión con el módulo (se usan los valores del script): %s', e.message);
+    return null;
+  }
+}
+
+function aplicarConfig_(c) {
+  if (!c) return;
+  const v = (c.ventanas || []).map(Number).filter(n => n > 0);
+  if (v.length) CONFIG.VENTANAS = v;
+  if (Number(c.ventana_desasignacion) > 0) CONFIG.VENTANA_DESASIGNACION = Number(c.ventana_desasignacion);
+}
+
+/** Igual que enviosAbiertos() del módulo: último envío de cada serial (≤ hoy), si no tiene retorno. */
+function enviosAbiertos_(envios, ref) {
+  const ultimo = {};
+  (envios || []).forEach(x => {
+    const f = parseFechaLocal(x.fecha_envio), k = limpiar(x.serial);
+    if (!f || !k || f > ref) return;
+    if (!ultimo[k] || f > ultimo[k].f) ultimo[k] = { x: x, f: f };
+  });
+  const abiertos = {};
+  Object.keys(ultimo).forEach(k => { if (!limpiar(ultimo[k].x.fecha_retorno)) abiertos[k] = ultimo[k].x; });
+  return abiertos;
+}
+
+const DIAS_ESPERA_WMS = 7;
+
+/** Igual que aplicarGestion() del módulo: la marca aplica al mismo vencimiento; Bloquear/Desasignar vencen a los 7 días. */
+function aplicarGestion_(lista, accion, marcas, ref) {
+  const espera = accion === 'revisar_estado' ? Infinity : DIAS_ESPERA_WMS;
+  const ultima = {};
+  (marcas || []).forEach(m => {
+    if (m.accion !== accion) return;
+    const k = limpiar(m.serial) + '|' + m.vence_ref;
+    if (!ultima[k] || Date.parse(m.gestionado_en) > Date.parse(ultima[k].gestionado_en)) ultima[k] = m;
+  });
+  const out = { pendientes: [], gestionados: [], sinEfecto: [] };
+  lista.forEach(e => {
+    const marca = e.vence ? ultima[e.serial + '|' + fIso(e.vence)] : null;
+    if (!marca) { out.pendientes.push(e); return; }
+    const dias = diasEntre(ref, new Date(Date.parse(marca.gestionado_en)));
+    if (dias <= espera) out.gestionados.push(e);
+    else { out.pendientes.push(e); out.sinEfecto.push(e); }
+  });
+  return out;
+}
+
+/** Listas del día ya descontando envíos abiertos y equipos gestionados (si hay conexión con el módulo). */
+function listasDelDia_(a, modulo, ref) {
+  const abiertos = modulo ? enviosAbiertos_(modulo.envios, ref) : {};
+  const marcas = modulo ? modulo.marcas : [];
+  const enviar = a.enviarLab.filter(e => !abiertos[e.serial]);
+  return {
+    conectado: !!modulo,
+    abiertos: abiertos,
+    bloquear: aplicarGestion_(a.bloquear, 'bloquear', marcas, ref),
+    desasignar: aplicarGestion_(a.desasignar, 'desasignar', marcas, ref),
+    vigentes: aplicarGestion_(a.vigentesEnPendiente, 'revisar_estado', marcas, ref),
+    enviar: enviar,
+    yaEnviados: a.enviarLab.length - enviar.length
+  };
+}
+
 /* ============================ AVISOS A CONTRATISTAS ====================== */
 /** 'vencido', o la ventana más pequeña que contiene al equipo ('7', '15', '30'). */
 function avisoDe(e) {
@@ -298,11 +413,12 @@ function avisoDe(e) {
 }
 
 /** Equipos (disponibles o asignados) en contratistas que hay que avisar hoy, por ubicación. */
-function avisosContratistas_(a, contactos, yaEnviados) {
+function avisosContratistas_(a, contactos, yaEnviados, excluir) {
   const porUbic = {};
   a.certificables.forEach(e => {
     if (e.bodegaBia || e.lab || !e.ubicacion || e.ubicacion.toUpperCase() === 'INSTALADO') return;
     if (e.estado !== 'DISPONIBLE' && e.estado !== 'ASIGNADO') return;
+    if (excluir[e.serial]) return; // ya enviado a laboratorio o gestionado en el módulo
     const aviso = avisoDe(e);
     if (!aviso || yaEnviados[e.serial + '||' + aviso]) return;
     const k = claveUbic(e.ubicacion);
@@ -314,33 +430,46 @@ function avisosContratistas_(a, contactos, yaEnviados) {
 
 /* ================================ ENVÍO ================================= */
 /**
- * @param {{prueba: boolean, soloCalcular?: boolean}} op
+ * @param {{prueba: boolean, soloCalcular?: boolean, reporteWms?: boolean}} op
  *   prueba: todo llega a TEST_EMAIL y el Log marca "prueba" (no cuenta como enviado).
  *   soloCalcular: no envía ni registra; devuelve el resumen.
+ *   reporteWms: además envía el reporte de calidad de datos a WMS_EMAIL.
  */
 function ejecutar_(op) {
   const ref = hoy0();
+  const modulo = datosModulo_();
+  if (modulo) aplicarConfig_(modulo.config);
   const a = analizar(obtenerInventario(), ref);
-  const grupos = CONFIG.AVISAR_CONTRATISTAS ? avisosContratistas_(a, mapaContactos_(), clavesEnviadas_()) : [];
+  const l = listasDelDia_(a, modulo, ref);
+  const excluir = {};
+  Object.keys(l.abiertos).forEach(s => { excluir[s] = true; });
+  l.bloquear.gestionados.concat(l.desasignar.gestionados).forEach(e => { excluir[e.serial] = true; });
+  const grupos = CONFIG.AVISAR_CONTRATISTAS ? avisosContratistas_(a, mapaContactos_(), clavesEnviadas_(), excluir) : [];
   const conCorreo = grupos.filter(g => g.correos.length);
   const sinCorreo = grupos.filter(g => !g.correos.length);
+  const enviarWms = !!(op.reporteWms && CONFIG.WMS_EMAIL);
   const resumen = {
+    conectadoAlModulo: l.conectado,
     certificables: a.certificables.length,
-    bloquear: a.bloquear.length,
-    desasignar: a.desasignar.length,
-    enviarLab: a.enviarLab.length,
+    bloquear: l.bloquear.pendientes.length,
+    bloquearGestionados: l.bloquear.gestionados.length,
+    desasignar: l.desasignar.pendientes.length,
+    desasignarGestionados: l.desasignar.gestionados.length,
+    enviarLab: l.enviar.length,
+    yaEnviados: l.yaEnviados,
     esperanRecertificacion: a.recert.length,
     masDe6Meses: a.recert6m,
-    vigentesEnPendiente: a.vigentesEnPendiente.length,
+    vigentesEnPendiente: l.vigentes.pendientes.length,
     contratistasAvisados: conCorreo.map(g => g.ubicacion + ' (' + g.items.length + ')'),
-    contratistasSinCorreo: sinCorreo.map(g => g.ubicacion + ' (' + g.items.length + ')')
+    contratistasSinCorreo: sinCorreo.map(g => g.ubicacion + ' (' + g.items.length + ')'),
+    reporteWms: enviarWms
   };
   if (op.soloCalcular) {
     Logger.log(JSON.stringify(resumen, null, 2));
     return resumen;
   }
 
-  const necesarios = conCorreo.length + 1;
+  const necesarios = conCorreo.length + 1 + (enviarWms ? 1 : 0);
   if (MailApp.getRemainingDailyQuota() < necesarios) {
     throw new Error('Cuota diaria de correo insuficiente: se necesitan ' + necesarios + ' envíos.');
   }
@@ -363,15 +492,28 @@ function ejecutar_(op) {
       g.correos.join(', '), op.prueba ? 'prueba' : 'enviado']));
   });
 
-  if (a.bloquear.length || a.desasignar.length || a.enviarLab.length || grupos.length) {
+  if (l.bloquear.pendientes.length || l.desasignar.pendientes.length || l.enviar.length || grupos.length) {
     MailApp.sendEmail({
       to: op.prueba ? CONFIG.TEST_EMAIL : CONFIG.SUPPLY_EMAIL,
       name: 'Bia · Vencimientos',
-      subject: (op.prueba ? '[PRUEBA] ' : '') + 'Vencimientos · Bloquear ' + a.bloquear.length +
-        ' · Desasignar ' + a.desasignar.length + ' · Enviar a laboratorio ' + a.enviarLab.length,
-      body: textoSupply_(a),
-      htmlBody: correoSupply_(a, conCorreo, sinCorreo, op.prueba),
-      attachments: [csvAcciones_(a, fecha)]
+      subject: (op.prueba ? '[PRUEBA] ' : '') + 'Vencimientos · Bloquear ' + l.bloquear.pendientes.length +
+        ' · Desasignar ' + l.desasignar.pendientes.length + ' · Enviar a laboratorio ' + l.enviar.length,
+      body: textoSupply_(a, l),
+      htmlBody: correoSupply_(a, l, conCorreo, sinCorreo, op.prueba),
+      attachments: [csvAcciones_(a, l, fecha)]
+    });
+  }
+
+  if (enviarWms) {
+    const c = calidadDatos_(a);
+    MailApp.sendEmail({
+      to: op.prueba ? CONFIG.TEST_EMAIL : CONFIG.WMS_EMAIL,
+      replyTo: CONFIG.SUPPLY_EMAIL,
+      name: 'Bia · Vencimientos',
+      subject: (op.prueba ? '[PRUEBA] ' : '') + 'Calidad de datos del inventario · ' + c.problemas.reduce((n, p) => n + p.items.length, 0) + ' registros por revisar',
+      body: 'Problemas de datos del inventario (Metabase card 18021). Detalle en el CSV adjunto.',
+      htmlBody: correoWms_(c, op.prueba),
+      attachments: [csvCalidad_(c, fecha)]
     });
   }
 
@@ -430,7 +572,7 @@ function bloqueAccion_(color, titulo, n, texto, chips, lista, conBiaCode) {
     '<div style="font-size:15px;font-weight:600;color:' + C.texto + '">' + esc(titulo) +
     ' <span style="font-size:22px;margin-left:6px">' + nf(n) + '</span></div>' +
     '<p style="margin:4px 0 10px;color:' + C.suave + ';font-size:13px">' + esc(texto) + '</p>' +
-    chips.map(chip_).join('') + (n ? tablaEquipos_(lista, conBiaCode) : '') + '</div>';
+    chips.filter(Boolean).map(chip_).join('') + (n ? tablaEquipos_(lista, conBiaCode) : '') + '</div>';
 }
 
 function contar_(lista, f) {
@@ -446,34 +588,45 @@ function envolver_(contenido, prueba, avisoPrueba) {
     contenido + '</div>';
 }
 
-function correoSupply_(a, conCorreo, sinCorreo, prueba) {
+/** Chips de gestión: "N gestionados · esperando WMS" y "M sin efecto en el WMS (+7 d)". */
+function chipsGestion_(g) {
+  return [
+    g.gestionados.length ? g.gestionados.length + ' gestionados · esperando WMS' : '',
+    g.sinEfecto.length ? g.sinEfecto.length + ' sin efecto en el WMS (+' + DIAS_ESPERA_WMS + ' d)' : ''
+  ];
+}
+
+function correoSupply_(a, l, conCorreo, sinCorreo, prueba) {
   const n = a.certificables.length;
   const pct = n ? Math.round(a.alDia / n * 100) : 0;
-  const enContr = a.bloquear.filter(e => !e.bodegaBia).length;
-  const codes = contar_(a.desasignar, e => e.biaCode);
+  const bloq = l.bloquear.pendientes, desa = l.desasignar.pendientes;
+  const enContr = bloq.filter(e => !e.bodegaBia).length;
+  const codes = contar_(desa, e => e.biaCode);
   const vs = CONFIG.VENTANAS.slice().sort((x, y) => x - y);
   const chipsEnvio = vs.map((v, i) => {
     const desde = i ? vs[i - 1] + 1 : 0;
-    const k = a.enviarLab.filter(e => e.dias >= desde && e.dias <= v).length;
+    const k = l.enviar.filter(e => e.dias >= desde && e.dias <= v).length;
     return (i ? desde + '–' + v + ' d' : '≤ ' + v + ' d') + ' · ' + k;
   });
-  const tiposVig = contar_(a.vigentesEnPendiente, e => e.tipoCorto).map(t => t[0] + ' ' + t[1]).join(', ');
+  const vig = l.vigentes.pendientes;
+  const tiposVig = contar_(vig, e => e.tipoCorto).map(t => t[0] + ' ' + t[1]).join(', ');
   const hoy = new Date();
   const contenido =
     '<h2 style="margin:0;font-size:20px">Vencimientos de certificados · ' + fFecha(hoy0()) + '</h2>' +
     '<p style="margin:4px 0 0;color:' + C.suave + ';font-size:13px">' + nf(n) + ' equipos certificables · <b style="color:' + C.verde + '">' + pct + '% al día</b> (vigentes a más de 30 días)</p>' +
-    bloqueAccion_(BARRA.bloquear, 'Bloquear', a.bloquear.length,
+    bloqueAccion_(BARRA.bloquear, 'Bloquear', bloq.length,
       'Disponibles con certificado vencido. Pásalos a Pendiente certificados para que no se despachen.',
-      [enContr + ' en contratistas', (a.bloquear.length - enContr) + ' en bodegas Bia'], a.bloquear, false) +
-    bloqueAccion_(BARRA.desasignar, 'Desasignar', a.desasignar.length,
+      [enContr + ' en contratistas', (bloq.length - enContr) + ' en bodegas Bia'].concat(chipsGestion_(l.bloquear)), bloq, false) +
+    bloqueAccion_(BARRA.desasignar, 'Desasignar', desa.length,
       'Asignados que vencen en ≤ ' + CONFIG.VENTANA_DESASIGNACION + ' días. Afecta ' + codes.length + ' Bia Codes.',
-      codes.map(c => c[0] + ' · ' + c[1]), a.desasignar, true) +
-    bloqueAccion_(BARRA.enviar, 'Enviar a laboratorio', a.enviarLab.length,
+      codes.map(c => c[0] + ' · ' + c[1]).concat(chipsGestion_(l.desasignar)), desa, true) +
+    bloqueAccion_(BARRA.enviar, 'Enviar a laboratorio', l.enviar.length,
       'Disponibles que vencen en ≤ ' + vs[vs.length - 1] + ' días. Envíalos antes de que venzan.',
-      chipsEnvio, a.enviarLab, false) +
+      chipsEnvio.concat([l.yaEnviados ? l.yaEnviados + ' ya enviados' : '']), l.enviar, false) +
     '<div style="margin:16px 0;padding:12px 16px;border-radius:10px;background:' + C.fondo + ';font-size:13px;line-height:1.6">' +
     '⏳ <b>' + nf(a.recert.length) + ' equipos esperan recertificación</b> (pendiente certificados, ya vencidos) · ' + nf(a.recert6m) + ' llevan más de 6 meses.' +
-    (a.vigentesEnPendiente.length ? '<br>🔎 <b>' + nf(a.vigentesEnPendiente.length) + ' equipos en Pendiente certificados ya tienen certificado vigente</b> (' + esc(tiposVig) + '): revisar si pasan a Disponible.' : '') +
+    (vig.length ? '<br>🔎 <b>' + nf(vig.length) + ' equipos en Pendiente certificados ya tienen certificado vigente</b> (' + esc(tiposVig) + '): revisar si pasan a Disponible.' +
+      (l.vigentes.gestionados.length ? ' ' + l.vigentes.gestionados.length + ' ya revisados.' : '') : '') +
     '</div>' +
     (conCorreo.length || sinCorreo.length ?
       '<div style="margin:16px 0;font-size:13px;line-height:1.6">' +
@@ -482,7 +635,9 @@ function correoSupply_(a, conCorreo, sinCorreo, prueba) {
       '</div>' : '') +
     '<p style="margin:20px 0 0"><a href="' + esc(CONFIG.URL_MODULO) + '" style="display:inline-block;padding:9px 14px;border-radius:8px;background:' + C.verde + ';color:#fff;text-decoration:none;font-size:13px;font-weight:600">Abrir el módulo de Vencidos</a></p>' +
     '<p style="margin:14px 0 0;color:#8c959f;font-size:11px">Datos en vivo de Metabase (card 18021) · generado ' +
-    Utilities.formatDate(hoy, CONFIG.ZONA_HORARIA, 'HH:mm') + ' · CSV adjunto con todas las acciones.</p>';
+    Utilities.formatDate(hoy, CONFIG.ZONA_HORARIA, 'HH:mm') + ' · ' +
+    (l.conectado ? 'conectado al módulo: se descuentan envíos registrados y equipos gestionados' : 'sin conexión al módulo: listas según el WMS') +
+    ' · CSV adjunto con todas las acciones.</p>';
   return envolver_(contenido, prueba, 'este resumen normalmente le llega a ' + esc(CONFIG.SUPPLY_EMAIL) + '.');
 }
 
@@ -508,9 +663,9 @@ function correoContratista_(g, prueba) {
   return envolver_(contenido, prueba, 'el destinatario real sería ' + esc(g.correos.join(', ')) + ' (con copia a Supply).');
 }
 
-function textoSupply_(a) {
+function textoSupply_(a, l) {
   return 'Vencimientos de certificados · ' + fFecha(hoy0()) + '\n' +
-    'Bloquear: ' + a.bloquear.length + ' · Desasignar: ' + a.desasignar.length + ' · Enviar a laboratorio: ' + a.enviarLab.length + '\n' +
+    'Bloquear: ' + l.bloquear.pendientes.length + ' · Desasignar: ' + l.desasignar.pendientes.length + ' · Enviar a laboratorio: ' + l.enviar.length + '\n' +
     'Esperan recertificación: ' + a.recert.length + ' (' + a.recert6m + ' con más de 6 meses)\n' +
     'Detalle en el CSV adjunto y en ' + CONFIG.URL_MODULO;
 }
@@ -522,15 +677,67 @@ function textoContratista_(g) {
     '\n\nPara coordinar la devolución, responde este correo (le llega a Supply).';
 }
 
-function csvAcciones_(a, fecha) {
-  const celda = v => { const s = v === null || v === undefined ? '' : String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-  const filas = [['accion', 'serial', 'tipo', 'sku', 'estado', 'ubicacion', 'bia_code', 'vence', 'certificado', 'dias']];
-  const add = (accion, lista) => lista.forEach(e => filas.push([accion, e.serial, e.tipoCorto, e.sku, e.estado, e.ubicacion, e.biaCode, fIso(e.vence), e.define, e.dias]));
-  add('Bloquear', a.bloquear);
-  add('Desasignar', a.desasignar);
-  add('Enviar a laboratorio', a.enviarLab);
-  add('Pendiente con certificado vigente', a.vigentesEnPendiente);
-  return Utilities.newBlob('﻿' + filas.map(f => f.map(celda).join(',')).join('\r\n'), 'text/csv', 'vencimientos-' + fecha + '.csv');
+const celdaCsv = v => { const s = v === null || v === undefined ? '' : String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+
+function csvAcciones_(a, l, fecha) {
+  const filas = [['accion', 'situacion', 'serial', 'tipo', 'sku', 'estado', 'ubicacion', 'bia_code', 'vence', 'certificado', 'dias']];
+  const add = (accion, lista, situacion) => lista.forEach(e => filas.push([accion, situacion(e), e.serial, e.tipoCorto, e.sku, e.estado, e.ubicacion, e.biaCode, fIso(e.vence), e.define, e.dias]));
+  const sit = g => e => g.gestionados.indexOf(e) >= 0 ? 'gestionado' : g.sinEfecto.indexOf(e) >= 0 ? 'sin efecto en el WMS' : 'pendiente';
+  add('Bloquear', a.bloquear, sit(l.bloquear));
+  add('Desasignar', a.desasignar, sit(l.desasignar));
+  add('Enviar a laboratorio', a.enviarLab, e => l.abiertos[e.serial] ? 'ya enviado' : 'pendiente');
+  add('Pendiente con certificado vigente', a.vigentesEnPendiente, e => l.vigentes.gestionados.indexOf(e) >= 0 ? 'revisado' : 'pendiente');
+  return Utilities.newBlob('﻿' + filas.map(f => f.map(celdaCsv).join(',')).join('\r\n'), 'text/csv', 'vencimientos-' + fecha + '.csv');
+}
+
+/* ====================== CALIDAD DE DATOS (equipo WMS) ===================== */
+/** Mismas categorías que el panel "Calidad de datos" del módulo. */
+function calidadDatos_(a) {
+  const todos = a.todos;
+  const cand = todos.filter(e => e.candidato);
+  const cuenta = {};
+  todos.forEach(e => { if (e.serial) cuenta[e.serial] = (cuenta[e.serial] || 0) + 1; });
+  return {
+    sinFecha: cand.filter(e => !e.vence && !e.cal.relleno && !e.conf.relleno),
+    conRelleno: cand.filter(e => e.cal.relleno || e.conf.relleno),
+    problemas: [
+      { label: 'Calibración con fecha 1960 (sin dato)', items: todos.filter(e => e.cal.relleno && e.cal.anio < 2000) },
+      { label: 'Conformidad 2070–2100 ("no vence")', items: todos.filter(e => e.conf.relleno && e.conf.anio >= 2060) },
+      { label: 'Serial con coma o espacios', items: todos.filter(e => e.serialRaw !== e.serialRaw.trim() || /[,\s]/.test(e.serialRaw.trim())) },
+      { label: 'Serial repetido', items: todos.filter(e => e.serial && cuenta[e.serial] > 1) },
+      { label: 'Pendiente certificados con certificado vigente (¿pasar a Disponible?)', items: a.vigentesEnPendiente },
+      { label: 'Instalado sin Bia Code', items: todos.filter(e => e.estado === 'INSTALADO' && !e.biaCode) },
+      {
+        label: 'Estado y ubicación se contradicen',
+        items: todos.filter(e => (e.ubicacion.toUpperCase() === 'INSTALADO' && e.estado !== 'INSTALADO') || (e.estado === 'INSTALADO' && e.bodegaBia))
+      }
+    ]
+  };
+}
+
+function correoWms_(c, prueba) {
+  const filas = c.problemas.filter(p => p.items.length).map(p =>
+    '<tr><td style="' + TD + '">' + esc(p.label) + '</td><td style="' + TD + ';text-align:right;font-weight:600">' + nf(p.items.length) + '</td>' +
+    '<td style="' + TD + ';font-family:Menlo,Consolas,monospace;font-size:12px;color:' + C.suave + '">' +
+    p.items.slice(0, 3).map(e => esc(e.serialRaw || '(sin serial)')).join(', ') + (p.items.length > 3 ? '…' : '') + '</td></tr>').join('');
+  const contenido =
+    '<h2 style="margin:0;font-size:18px">Calidad de datos del inventario · semana del ' + fFecha(hoy0()) + '</h2>' +
+    '<p style="margin:8px 0 0;font-size:14px;line-height:1.5">Estos registros de Metabase (card 18021) tienen datos que afectan el control de vencimientos. Se corrigen en el WMS. El detalle completo va en el CSV adjunto.</p>' +
+    '<table role="presentation" style="border-collapse:collapse;width:100%;margin-top:12px">' +
+    '<tr><th style="' + TH + '">Problema</th><th style="' + TH + ';text-align:right">Registros</th><th style="' + TH + '">Ejemplos</th></tr>' +
+    filas + '</table>' +
+    '<p style="margin:14px 0 0;font-size:13px;color:' + C.suave + '">Afecta directamente el módulo: <b>' + nf(c.sinFecha.length) + '</b> equipos certificables sin ninguna fecha de certificado y <b>' +
+    nf(c.conRelleno.length) + '</b> con una fecha de relleno (1960 o 2070+).</p>';
+  return envolver_(contenido, prueba, 'este reporte normalmente le llega a ' + esc(CONFIG.WMS_EMAIL) + '.');
+}
+
+function csvCalidad_(c, fecha) {
+  const filas = [['problema', 'serial', 'sku', 'estado', 'ubicacion', 'bia_code']];
+  const add = (label, lista) => lista.forEach(e => filas.push([label, e.serialRaw, e.sku, e.estado, e.ubicacion, e.biaCode]));
+  add('Certificable sin fecha de certificado', c.sinFecha);
+  add('Fecha de relleno ignorada', c.conRelleno);
+  c.problemas.forEach(p => add(p.label, p.items));
+  return Utilities.newBlob('﻿' + filas.map(f => f.map(celdaCsv).join(',')).join('\r\n'), 'text/csv', 'calidad-datos-' + fecha + '.csv');
 }
 
 /* ======================= FUNCIONES PARA EJECUTAR ========================= */
@@ -539,9 +746,14 @@ function previsualizar() {
   return ejecutar_({ prueba: true, soloCalcular: true });
 }
 
-/** 2) Envía TODO solo a ti (TEST_EMAIL) para revisar cómo llegan los correos. */
+/** 2) Envía TODO solo a ti (TEST_EMAIL), incluido el reporte del WMS si WMS_EMAIL está configurado. */
 function probar() {
-  return ejecutar_({ prueba: true });
+  return ejecutar_({ prueba: true, reporteWms: true });
+}
+
+/** Envía ahora el reporte de calidad de datos (respeta MODO_PRUEBA). */
+function enviarReporteWms() {
+  return ejecutar_({ prueba: CONFIG.MODO_PRUEBA, reporteWms: true });
 }
 
 /** 3) Instala el envío diario a la hora configurada. Ejecútalo una sola vez. */
@@ -555,9 +767,7 @@ function instalarTrigger() {
 
 /** La llama el disparador. Mientras MODO_PRUEBA sea true, todo te llega solo a ti. */
 function tareaDiaria() {
-  if (CONFIG.SOLO_DIAS_HABILES) {
-    const dia = Number(Utilities.formatDate(new Date(), CONFIG.ZONA_HORARIA, 'u')); // 1 = lunes … 7 = domingo
-    if (dia >= 6) return;
-  }
-  ejecutar_({ prueba: CONFIG.MODO_PRUEBA });
+  const dia = Number(Utilities.formatDate(new Date(), CONFIG.ZONA_HORARIA, 'u')); // 1 = lunes … 7 = domingo
+  if (CONFIG.SOLO_DIAS_HABILES && dia >= 6) return;
+  ejecutar_({ prueba: CONFIG.MODO_PRUEBA, reporteWms: dia === CONFIG.DIA_REPORTE_WMS });
 }
